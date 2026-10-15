@@ -269,10 +269,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     //タイトルもんげ
     int monge1 =
         Novice::LoadTexture("./tntn/monge1.png");
-    int monge2 =
+    int monge2 =              
         Novice::LoadTexture("./tntn/monge2.png");
-    int monge3 =
+    int monge3 =              
         Novice::LoadTexture("./tntn/monge3.png");
+    // 現在選択している項目// 選択番号（0:左、1:中央、2:右）
+    int titleSelect = 0;
 
     // 爆発音
     int Explosion01 = Novice::LoadAudio("./Resources/Explosion01-1(Short).mp3");
@@ -289,9 +291,48 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         ///
         /// ↓更新処理
         ///
-        if (scene == SCENE_TITLE && keys[DIK_SPACE] && !preKeys[DIK_SPACE] && fadeState == FADE_NONE)
+        if (scene == SCENE_TITLE && fadeState == FADE_NONE)
         {
-            fadeState = FADE_OUT;
+            // Aキーで左へ
+            if (keys[DIK_A] && !preKeys[DIK_A])
+            {
+                titleSelect--;
+
+                if (titleSelect < 0)
+                {
+                    titleSelect = 2;
+                }
+            }
+
+            // Dキーで右へ
+            if (keys[DIK_D] && !preKeys[DIK_D])
+            {
+                titleSelect++;
+
+                if (titleSelect > 2)
+                {
+                    titleSelect = 0;
+                }
+            }
+
+            // Enterキーで決定
+            if (keys[DIK_RETURN] && !preKeys[DIK_RETURN])
+            {
+                if (titleSelect == 0)
+                {
+                    // 左：ゲーム開始
+                    fadeState = FADE_OUT;
+                }
+                else if (titleSelect == 1)
+                {
+                    // 中央：操作説明（後から実装）
+                }
+                else if (titleSelect == 2)
+                {
+                    // 右：終了
+                    break;
+                }
+            }
         }
 
         // フェード処理
@@ -629,23 +670,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         ///
         /// ↓描画処理
         ///
-
         if (scene == SCENE_TITLE)
         {
-            //タイトル
-            Novice::DrawBox(
+            int titleTexture = monge1;
+
+            if (titleSelect == 0)
+            {
+                titleTexture = monge1;
+            }
+            else if (titleSelect == 1)
+            {
+                titleTexture = monge2;
+            }
+            else if (titleSelect == 2)
+            {
+                titleTexture = monge3;
+            }
+
+            // 選択状態に応じて画像を切り替える
+            Novice::DrawSprite(
                 0,
                 0,
-                1280,
-                720,
+                titleTexture,
+                1.0f,
+                1.0f,
                 0.0f,
-                BLUE,
-                kFillModeSolid
-            );
-            Novice::ScreenPrintf(
-                450,
-                350,
-                "PRESS SPACE"
+                WHITE
             );
         }
         else if (scene == SCENE_GAME)
