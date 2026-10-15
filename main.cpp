@@ -3,7 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <cmath>
-const char kWindowTitle[] = "LC1D_03_イシダ_ノリヒコ_タイトル";
+const char kWindowTitle[] = "LC1D_03_イダ_ノコ_タルト";
 
 const int kTileSize = 32;
 const int kMapWidth = 200;
