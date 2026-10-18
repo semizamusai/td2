@@ -36,6 +36,8 @@ int map[kMapHeight][kMapWidth] =
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
+int backGroundRandomX{};;//ランダム
+int backGroundRandomY{};;//ランダム
 
 void DrawMap(float cameraX)
 {
@@ -48,8 +50,8 @@ void DrawMap(float cameraX)
                 continue;
             }
 
-            int worldX = x * kTileSize;
-            int worldY = y * kTileSize;
+            int worldX = x * kTileSize + backGroundRandomX;
+            int worldY = y * kTileSize + backGroundRandomY;
 
             int screenX = (int)(worldX - cameraX);
 
@@ -159,6 +161,13 @@ struct Enemy {
     int knockbackTimer;
 };
 
+struct Shake {
+    int duration;//揺れの時間
+    int amplitude;//揺れの振幅
+    bool backGroundFlag;//背景の揺れフラグ
+
+};
+
 Vector2 Player = { 640.0f, 300.0f };
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -218,6 +227,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
     bool isGround = false;
 
+    Shake shake;
+    shake.duration = 2;//揺れの時間
+    shake.amplitude = 30;//揺れの振幅
+    shake.backGroundFlag = false;//背景の揺れフラグ
 
     // 50体の敵をマップの空きスペースに配置
     const int kEnemyCount = 100;
@@ -269,9 +282,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     //タイトルもんげ
     int monge1 =
         Novice::LoadTexture("./tntn/monge1.png");
-    int monge2 =              
+    int monge2 =
         Novice::LoadTexture("./tntn/monge2.png");
-    int monge3 =              
+    int monge3 =
         Novice::LoadTexture("./tntn/monge3.png");
     // 現在選択している項目// 選択番号（0:左、1:中央、2:右）
     int titleSelect = 0;
@@ -517,6 +530,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                 }
                             }
                         }
+
+                        //shake起動条件
+                        if (bombs[i].timer == 0) {
+                            shake.backGroundFlag = true;
+                        }
+
                     }
                 }
                 else
@@ -620,6 +639,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
 
+        //背景の揺れ処理
+        if (shake.backGroundFlag) {
+
+            backGroundRandomX = rand() % (shake.amplitude * 2 + 1) - shake.amplitude;
+            backGroundRandomY = rand() % (shake.amplitude * 2 + 1) - shake.amplitude;
+
+            shake.duration--;
+
+            if (shake.duration <= 0) {
+                shake.backGroundFlag = false;
+
+                //シェイク終了時に元の位置へ戻す
+                backGroundRandomX = 0;
+                backGroundRandomY = 0;
+                //初期化
+                shake.duration = 2;
+            }
+        }
+
         //カメラのスクロール
         float cameraTargetX = player.x - 740.0f;
 
@@ -702,10 +740,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         {
             //背景
             Novice::DrawBox(
-                0,
-                0,
-                1280,
-                720,
+                -50 + backGroundRandomX,
+                -50 + backGroundRandomY,
+                1500,
+                790,
                 0.0f,
                 0x000000FF,
                 kFillModeSolid
@@ -725,15 +763,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 {
                     Novice::DrawLine(
                         screenX,
-                        (int)groundY - 20,
+                        (int)groundY - 20 + backGroundRandomY,
                         screenX,
-                        (int)groundY,
+                        (int)groundY + backGroundRandomY,
                         0xFFFFFFFF
                     );
 
                     Novice::ScreenPrintf(
-                        screenX + 5,
-                        (int)groundY - 40,
+                        screenX + 5 + backGroundRandomX,
+                        (int)groundY - 40 + backGroundRandomY,
                         "%d",
                         x
                     );
@@ -742,8 +780,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
             // プレイヤー
             Novice::DrawBox(
-                (int)(player.x - cameraX) - 20,
-                (int)player.y - 20,
+                (int)(player.x - cameraX) - 20 + backGroundRandomX,
+                (int)player.y - 20 + backGroundRandomY,
                 40,
                 40,
                 0.0f,
@@ -764,8 +802,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     {
                         // 爆弾本体
                         Novice::DrawBox(
-                            screenX - 10,
-                            screenY - 10,
+                            screenX - 10 + backGroundRandomX,
+                            screenY - 10 + backGroundRandomY,
                             20,
                             20,
                             0.0f,
@@ -801,16 +839,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 if (enemies[e].isAlive)
                 {
                     Novice::DrawBox(
-                        (int)(enemies[e].x - cameraX - 20.0f),
-                        (int)(enemies[e].y - 20.0f),
+                        (int)(enemies[e].x - cameraX - 20.0f) + backGroundRandomX,
+                        (int)(enemies[e].y - 20.0f) + backGroundRandomY,
                         40, 40, 0.0f, 0xFF4444FF, kFillModeSolid
                     );
                 }
 
             // プレイヤーの当たり判定の描画
             Novice::DrawBox(
-                (int)(player.x - cameraX - playerWidth / 2.0f),
-                (int)(player.y - playerHeight / 2.0f),
+                (int)(player.x - cameraX - playerWidth / 2.0f) + backGroundRandomX,
+                (int)(player.y - playerHeight / 2.0f) + backGroundRandomY,
                 (int)playerWidth,
                 (int)playerHeight,
                 0.0f,
