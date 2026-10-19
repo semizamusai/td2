@@ -144,6 +144,10 @@ struct Vector2 {
 struct Bomb {
     float x;
     float y;
+
+    float velocityX;
+    float velocityY;
+
     int timer;
     bool isActive;
     bool isExplosion;
@@ -159,6 +163,10 @@ struct Enemy {
     bool isAlive;
     bool isKnockedBack;
     int knockbackTimer;
+    bool isDead;          // 倒されたか
+    int deathTimer;       // 消えるまでの時間
+    float rotation;       // 回転角度
+    float rotationSpeed;  // 回転速度
 };
 
 struct Shake {
@@ -474,6 +482,74 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             {
                 if (!bombs[i].isExplosion)
                 {
+
+                    //====================
+                    // 爆弾の物理処理
+                    //====================
+
+                    // 重力
+                    bombs[i].velocityY += 0.6f;
+
+                    // 最大落下速度
+                    if (bombs[i].velocityY > 15.0f)
+                    {
+                        bombs[i].velocityY = 15.0f;
+                    }
+
+                    // 横方向の摩擦
+                    bombs[i].velocityX *= 0.98f;
+
+                    // 横方向の移動と壁判定
+                    float remainingX = bombs[i].velocityX;
+
+                    while (fabsf(remainingX) > 0.001f)
+                    {
+                        float stepX = remainingX;
+
+                        if (stepX > 4.0f) stepX = 4.0f;
+                        if (stepX < -4.0f) stepX = -4.0f;
+
+                        float nextX = bombs[i].x + stepX;
+
+                        if (nextX >= 10.0f &&
+                            nextX <= kMapWidth * kTileSize - 10.0f &&
+                            !CheckMapCollision(
+                                nextX, bombs[i].y, 20.0f, 20.0f))
+                        {
+                            bombs[i].x = nextX;
+                            remainingX -= stepX;
+                        } else
+                        {
+                            bombs[i].velocityX = 0.0f;
+                            break;
+                        }
+                    }
+
+                    // 縦方向の移動と床・天井判定
+                    float remainingY = bombs[i].velocityY;
+
+                    while (fabsf(remainingY) > 0.001f)
+                    {
+                        float stepY = remainingY;
+
+                        if (stepY > 4.0f) stepY = 4.0f;
+                        if (stepY < -4.0f) stepY = -4.0f;
+
+                        float nextY = bombs[i].y + stepY;
+
+                        if (nextY >= 10.0f &&
+                            !CheckMapCollision(
+                                bombs[i].x, nextY, 20.0f, 20.0f))
+                        {
+                            bombs[i].y = nextY;
+                            remainingY -= stepY;
+                        } else
+                        {
+                            bombs[i].velocityY = 0.0f;
+                            break;
+                        }
+                    }
+
                     bombs[i].timer--;
 
                     // 爆発15フレーム前に1回だけ再生
@@ -504,6 +580,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             velocityY = -25.0f;
                         }
 
+                        //====================
+                       // 爆風で別の爆弾を吹き飛ばす
+                       //====================
+                        for (int j = 0; j < kBombCount; j++)
+                        {
+                            // 自分自身や爆発中の爆弾は除外
+                            if (i == j || !bombs[j].isActive ||
+                                bombs[j].isExplosion)
+                            {
+                                continue;
+                            }
+
+                            float dx1 = bombs[j].x - bombs[i].x;
+                            float dy1 = bombs[j].y - bombs[i].y;
+
+                            float distance1 = sqrtf(dx1 * dx1 + dy1 * dy1);
+
+                            if (distance1 < explosionRadius)
+                            {
+                                float directionX = 1.0f;
+
+                                if (distance1 > 0.001f)
+                                {
+                                    directionX = dx1 / distance1;
+                                }
+
+                                // 横方向に吹き飛ばす
+                                bombs[j].velocityX = directionX * 20.0f;
+
+                                // 上方向にも吹き飛ばす
+                                bombs[j].velocityY = -15.0f;
+                            }
+                        }
+
                         // 爆発範囲内の敵をそれぞれ吹き飛ばす
                         for (int e = 0; e < spawnedEnemies; ++e)
                         {
@@ -529,6 +639,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                     enemies[e].velocityY = -12.0f;
                                     enemies[e].isKnockedBack = true;
                                     enemies[e].knockbackTimer = 45;
+                                    enemies[e].isDead = true;
+                                    enemies[e].deathTimer = 180;
+                                    enemies[e].rotationSpeed = directionX * 0.16f;
                                 }
                             }
                         }
