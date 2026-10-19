@@ -3,7 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <cmath>
-const char kWindowTitle[] = "LC1D_03_イシダ_ノリヒコ_タイトル";
+const char kWindowTitle[] = "LC1D_03_イシダ_ノリヒコ_タイト";
 
 const int kTileSize = 32;
 const int kMapWidth = 200;
@@ -462,6 +462,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     {
                         bombs[i].x = player.x;
                         bombs[i].y = player.y + 10;
+
+                        bombs[i].velocityX = 0.0f;
+                        bombs[i].velocityY = 0.0f;
 
                         bombs[i].timer = bombFuseTime;
                         bombs[i].isActive = true;
