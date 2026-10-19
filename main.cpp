@@ -238,47 +238,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int spawnedEnemies = 0;
     const float enemySize = 40.0f;
 
-    // X方向に候補を並べ、各地点の地面の上に配置する
-    for (int x = 160; x < kMapWidth * kTileSize - 40 && spawnedEnemies < kEnemyCount; x += 80)
-    {
-        for (int y = (kMapHeight - 1) * kTileSize - 20; y >= 20; y -= 4)
-        {
-            float spawnX = (float)x;
-            float spawnY = (float)y;
-            // 敵の全身が空間内、足元に床がある位置だけ採用
-            if (CheckMapCollision(spawnX, spawnY, enemySize, enemySize) ||
-                !CheckMapCollision(spawnX, spawnY + 2.0f, enemySize, enemySize))
-            {
-                continue;
-            }
-            // プレイヤーの初期位置付近には置かない
-            if (fabsf(spawnX - player.x) < 80.0f && fabsf(spawnY - player.y) < 80.0f)
-            {
-                continue;
-            }
-            // 敵同士が初期状態で重ならないようにする
-            bool overlaps = false;
-            for (int j = 0; j < spawnedEnemies; ++j)
-            {
-                if (fabsf(enemies[j].x - spawnX) < enemySize + 4.0f &&
-                    fabsf(enemies[j].y - spawnY) < enemySize + 4.0f)
-                {
-                    overlaps = true;
-                    break;
-                }
-            }
-            if (overlaps) continue;
-
-            Enemy& e = enemies[spawnedEnemies++];
-            e.x = spawnX;
-            e.y = spawnY;
-            e.speed = 2.0f;
-            e.isAlive = true;
-            e.isKnockedBack = false;
-            e.knockbackTimer = 0;
-            break;
-        }
-    }
+   
     //タイトルもんげ
     int monge1 =
         Novice::LoadTexture("./tntn/monge1.png");
@@ -379,6 +339,48 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             //====================
             // プレイヤー左右移動
             //====================
+
+             // X方向に候補を並べ、各地点の地面の上に配置する
+            for (int x = 160; x < kMapWidth * kTileSize - 40 && spawnedEnemies < kEnemyCount; x += 80)
+            {
+                for (int y = (kMapHeight - 1) * kTileSize - 20; y >= 20; y -= 4)
+                {
+                    float spawnX = (float)x;
+                    float spawnY = (float)y;
+                    // 敵の全身が空間内、足元に床がある位置だけ採用
+                    if (CheckMapCollision(spawnX, spawnY, enemySize, enemySize) ||
+                        !CheckMapCollision(spawnX, spawnY + 2.0f, enemySize, enemySize))
+                    {
+                        continue;
+                    }
+                    // プレイヤーの初期位置付近には置かない
+                    if (fabsf(spawnX - player.x) <640.0f && fabsf(spawnY - player.y) < 400.0f)
+                    {
+                        continue;
+                    }
+                    // 敵同士が初期状態で重ならないようにする
+                    bool overlaps = false;
+                    for (int j = 0; j < spawnedEnemies; ++j)
+                    {
+                        if (fabsf(enemies[j].x - spawnX) < enemySize + 4.0f &&
+                            fabsf(enemies[j].y - spawnY) < enemySize + 4.0f)
+                        {
+                            overlaps = true;
+                            break;
+                        }
+                    }
+                    if (overlaps) continue;
+
+                    Enemy& e = enemies[spawnedEnemies++];
+                    e.x = spawnX;
+                    e.y = spawnY;
+                    e.speed = 2.0f;
+                    e.isAlive = true;
+                    e.isKnockedBack = false;
+                    e.knockbackTimer = 0;
+                    break;
+                }
+            }
 
             // Dキーで右移動
             if (keys[DIK_D]) {
