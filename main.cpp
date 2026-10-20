@@ -254,6 +254,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         Novice::LoadTexture("./tntn/monge2.png");
     int monge3 =
         Novice::LoadTexture("./tntn/monge3.png");
+
+    int enterSE = Novice::LoadAudio("./Resources/ENTER.mp3");
     // 現在選択している項目// 選択番号（0:左、1:中央、2:右）
     int titleSelect = 0;
 
@@ -299,6 +301,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // Enterキーで決定
             if (keys[DIK_RETURN] && !preKeys[DIK_RETURN])
             {
+                // Enterキーの効果音を再生
+                Novice::PlayAudio(enterSE, false, 1.0f);
+
                 if (titleSelect == 0)
                 {
                     // 左：ゲーム開始
