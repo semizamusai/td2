@@ -39,7 +39,9 @@ int map[kMapHeight][kMapWidth] =
 int backGroundRandomX{};;//ランダム
 int backGroundRandomY{};;//ランダム
 
-void DrawMap(float cameraX)
+void DrawMap(float cameraX,
+    int yukaTexture,
+    int breakableYukaTexture)
 {
     for (int y = 0; y < kMapHeight; y++)
     {
@@ -72,23 +74,22 @@ void DrawMap(float cameraX)
                 kFillModeSolid
             );
 
+            int tileTexture = yukaTexture;
 
-            //タイル種別ごとに色を決定
-            unsigned int tileColor = GREEN;// 通常の地面・壁
 
             if (map[y][x] == 3)
             {
-                tileColor = 0x8B4513FF; //壊せる壁（茶色）
+                tileTexture = breakableYukaTexture;
             }
 
-            Novice::DrawBox(
+            Novice::DrawSprite(
                 screenX,
                 worldY,
-                kTileSize,
-                kTileSize,
+                tileTexture,
+                1.0f,
+                1.0f,
                 0.0f,
-                tileColor,
-                kFillModeSolid
+                WHITE
             );
         }
     }
@@ -144,6 +145,7 @@ bool CheckMapCollision(
     return false;
 }
 
+
 enum Scene {
     SCENE_TITLE,
     SCENE_GAME
@@ -159,6 +161,23 @@ struct Vector2 {
     float x{};
     float y{};
 };
+
+struct BreakParticle {
+    float x{};
+    float y{};
+    float velocityX{};
+    float velocityY{};
+    int sourceX{};
+    int sourceY{};
+    int life{};
+    bool isActive{};
+};
+
+// パーティクルの最大数
+const int kMaxBreakParticles = 100;
+
+// パーティクル配列
+BreakParticle breakParticles[kMaxBreakParticles]{};
 
 struct Bomb {
     float x{};
@@ -192,6 +211,52 @@ struct Enemy {
     int chainTimer = 0;        // 誘爆までの待ち時間
 };
 
+    // 壁が壊れたときにパーティクルを発生させる
+
+void SpawnBreakParticles(float x, float y)
+{
+    const int kParticleCount = 16;
+    const int kPieceSize = 1;
+    int count = 0;
+
+    for (int i = 0; i < kMaxBreakParticles; i++)
+    {
+        if (!breakParticles[i].isActive)
+        {
+            int column = count % 4;
+            int row = count / 4;
+
+            // 破片の初期位置
+            breakParticles[i].x = x + column * kPieceSize;
+            breakParticles[i].y = y + row * kPieceSize;
+
+            // 横方向をランダムにする（左・右）
+            breakParticles[i].velocityX =
+                (float)(rand() % 801 - 400) / 100.0f;
+
+            // 縦方向をランダムにする（上方向に飛ぶ）
+            breakParticles[i].velocityY =
+                -(float)(rand() % 601 + 200) / 100.0f;
+
+            // 画像の切り出し位置
+            breakParticles[i].sourceX = column * kPieceSize;
+            breakParticles[i].sourceY = row * kPieceSize;
+
+            // 寿命もランダムにする
+            breakParticles[i].life = 20 + rand() % 21;
+
+            breakParticles[i].isActive = true;
+
+            count++;
+
+            if (count >= kParticleCount)
+            {
+                break;
+            }
+        }
+    }
+}
+
 struct Shake {
     int duration;//揺れの時間
     int amplitude;//揺れの振幅
@@ -201,6 +266,8 @@ struct Shake {
 
 Vector2 Player = { 640.0f, 300.0f };
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+
+    srand((unsigned int)time(nullptr));
 
     Novice::Initialize(kWindowTitle, 1280, 720);
 
@@ -278,14 +345,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int monge3 =
         Novice::LoadTexture("./tntn/monge3.png");
 
+
+    // マップ・爆弾のテクスチャ
+    int yukaTexture =
+        Novice::LoadTexture("./Resources/yuka.png");
+
+    int bombTexture =
+        Novice::LoadTexture("./Resources/bomb.png");
+
+    int breakableYukaTexture =
+        Novice::LoadTexture("./Resources/kowareruyuka.png");
+
     int enterSE = Novice::LoadAudio("./Resources/ENTER.mp3");
+
+    int hakaiSE = Novice::LoadAudio("./Resources/hakai.mp3");
     // 現在選択している項目// 選択番号（0:左、1:中央、2:右）
     int titleSelect = 0;
 
     // 爆発音
     int Explosion01 = Novice::LoadAudio("./Resources/Explosion01-1(Short).mp3");
     int bgm = Novice::LoadAudio("./Resources/icarusnotsuiraku.mp3");
-    Novice::PlayAudio(bgm, true, 1.0f);
+    Novice::PlayAudio(bgm, true, 0.5f);
 
     while (Novice::ProcessMessage() == 0) {
 
@@ -714,26 +794,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         {
                             for (int checkX = minExTileX; checkX <= maxExTileX; checkX++)
                             {
-                                // マップ配列の範囲外アクセスを防ぐ
-                                if (checkX >= 0 && checkX < kMapWidth && checkY >= 0 && checkY < kMapHeight)
+                                // マップ配列の範囲内か確認
+                                if (checkX < 0 || checkX >= kMapWidth ||
+                                    checkY < 0 || checkY >= kMapHeight)
                                 {
-                                    // 壊せる壁（kTileBreakable）の場合のみ判定
-                                    if (map[checkY][checkX] == 3)
+                                    continue;
+                                }
+
+                                // 壊せる壁の場合
+                                if (map[checkY][checkX] == 3)
+                                {
+                                    float tileCenterX = (checkX + 0.5f) * kTileSize;
+                                    float tileCenterY = (checkY + 0.5f) * kTileSize;
+
+                                    float diffX = tileCenterX - bombs[i].x;
+                                    float diffY = tileCenterY - bombs[i].y;
+                                    float distanceToBomb = sqrtf(diffX * diffX + diffY * diffY);
+
+                                    // 爆発範囲内なら破壊
+                                    if (distanceToBomb <= explosionRadius)
                                     {
-                                        // 対象タイルの中心座標
-                                        float tileCenterX = (checkX + 0.5f) * kTileSize;
-                                        float tileCenterY = (checkY + 0.5f) * kTileSize;
+                                        float particleX = (float)(checkX * kTileSize);
+                                        float particleY = (float)(checkY * kTileSize);
 
-                                        // 爆発中心からの距離を計算
-                                        float diffX = tileCenterX - bombs[i].x;
-                                        float diffY = tileCenterY - bombs[i].y;
-                                        float distanceToBomb = sqrtf(diffX * diffX + diffY * diffY);
+                                        SpawnBreakParticles(particleX, particleY);
 
-                                        //爆発半径内なら破壊（空間に変える）
-                                        if (distanceToBomb <= explosionRadius)
-                                        {
-                                            map[checkY][checkX] = 0;
-                                        }
+                                        // ブロック破壊SE
+                                        Novice::PlayAudio(hakaiSE, false, 0.1f);
+
+                                        // 壁を消す
+                                        map[checkY][checkX] = 0;
                                     }
                                 }
                             }
@@ -995,6 +1085,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             velocityY = 0.0f;
         }
 
+        // 壊せる壁のパーティクル更新
+        for (int i = 0; i < kMaxBreakParticles; i++)
+        {
+            if (!breakParticles[i].isActive)
+            {
+                continue;
+            }
+
+            breakParticles[i].x += breakParticles[i].velocityX;
+            breakParticles[i].y += breakParticles[i].velocityY;
+
+            // 重力
+            breakParticles[i].velocityY += 0.25f;
+
+            // 空気抵抗
+            breakParticles[i].velocityX *= 0.99f;
+
+            // 寿命
+            breakParticles[i].life--;
+
+            if (breakParticles[i].life <= 0)
+            {
+                breakParticles[i].isActive = false;
+            }
+        }
 
         ///
         /// ↑更新処理
@@ -1044,9 +1159,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 kFillModeSolid
             );
 
-            DrawMap(cameraX);
+            DrawMap(cameraX ,
+                yukaTexture,
+                breakableYukaTexture);
 
+            // 壊せる壁の破片を描画
+            for (int i = 0; i < kMaxBreakParticles; i++)
+            {
+                if (!breakParticles[i].isActive)
+                {
+                    continue;
+                }
 
+                Novice::DrawSpriteRect(
+                    (int)(breakParticles[i].x - cameraX) + backGroundRandomX,
+                    (int)breakParticles[i].y + backGroundRandomY,
+                    breakParticles[i].sourceX,
+                    breakParticles[i].sourceY,
+                    8,
+                    8,
+                    breakableYukaTexture,
+                    1.0f,
+                    1.0f,
+                    0.0f,
+                    WHITE
+                );
+            }
 
             // スクロール確認用のめもり
             for (int x = 0; x <= 5000; x += 100)
@@ -1095,15 +1233,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                     if (!bombs[i].isExplosion)
                     {
-                        // 爆弾本体
-                        Novice::DrawBox(
+                       // 爆弾本体
+                        Novice::DrawSprite(
                             screenX - 10 + backGroundRandomX,
                             screenY - 10 + backGroundRandomY,
-                            20,
-                            20,
+                            bombTexture,
+                            1.0f,
+                            1.0f,
                             0.0f,
-                            0xFF0000FF,
-                            kFillModeSolid
+                            WHITE
                         );
                     }
                     else
@@ -1128,18 +1266,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
 
-            for (int i = 0; i < spawnedEnemies; i++) {
+            for (int j = 0; j < spawnedEnemies; j++) {
 
-                if (enemies[i].isExploding) {
+                if (enemies[j].isExploding) {
 
                     float progress =
-                        1.0f - enemies[i].explosionTimer / 15.0f;
+                        1.0f - enemies[j].explosionTimer / 15.0f;
 
                     int radius = (int)(20.0f + progress * 100.0f);
 
                     Novice::DrawEllipse(
-                        (int)(enemies[i].x - cameraX),
-                        (int)enemies[i].y,
+                        (int)(enemies[j].x - cameraX),
+                        (int)enemies[j].y,
                         radius,
                         radius,
                         0.0f,
