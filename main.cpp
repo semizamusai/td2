@@ -320,9 +320,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     const float explosionRadius = 100.0f;
     const float bombKnockBack = 20.0f;
 
-    // 床
-    float groundY = 650.0f;
-
     bool isGround = false;
 
     Shake shake;
