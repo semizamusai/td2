@@ -315,9 +315,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     Bomb bombs[kBombCount] = {};
 
     // 爆弾の設定
-    const int bombFuseTime = 60;
+    const int bombFuseTime = 40;
     const int explosionDuration = 15;
-    const float explosionRadius = 100.0f;
+    const float explosionRadius = 130.0f;
     const float bombKnockBack = 20.0f;
 
     bool isGround = false;
@@ -1193,6 +1193,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 0x00AAFFFF,
                 kFillModeSolid
             );
+
+            // 追跡型の敵（赤い四角）
+            for (int e = 0; e < spawnedEnemies; ++e)
+                if (enemies[e].isAlive)
+                {
+                    Novice::DrawBox(
+                        (int)(enemies[e].x - cameraX - 20.0f) + backGroundRandomX,
+                        (int)(enemies[e].y - 20.0f) + backGroundRandomY,
+                        40, 40, 0.0f, 0xFF4444FF, kFillModeSolid
+                    );
+                }
+
             //====================
             // 爆弾の描画
             //====================
@@ -1258,17 +1270,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     );
                 }
             }
-
-            // 追跡型の敵（赤い四角）
-            for (int e = 0; e < spawnedEnemies; ++e)
-                if (enemies[e].isAlive)
-                {
-                    Novice::DrawBox(
-                        (int)(enemies[e].x - cameraX - 20.0f) + backGroundRandomX,
-                        (int)(enemies[e].y - 20.0f) + backGroundRandomY,
-                        40, 40, 0.0f, 0xFF4444FF, kFillModeSolid
-                    );
-                }
 
             // プレイヤーの当たり判定の描画
             Novice::DrawBox(
