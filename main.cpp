@@ -1186,31 +1186,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 );
             }
 
-            // スクロール確認用のめもり
-            for (int x = 0; x <= 5000; x += 100)
-            {
-                int screenX = x - (int)cameraX;
-
-                // 画面内だけ描画
-                if (screenX >= 0 && screenX <= 1280)
-                {
-                    Novice::DrawLine(
-                        screenX,
-                        (int)groundY - 20 + backGroundRandomY,
-                        screenX,
-                        (int)groundY + backGroundRandomY,
-                        0xFFFFFFFF
-                    );
-
-                    Novice::ScreenPrintf(
-                        screenX + 5 + backGroundRandomX,
-                        (int)groundY - 40 + backGroundRandomY,
-                        "%d",
-                        x
-                    );
-                }
-            }
-
             // プレイヤー
             Novice::DrawBox(
                 (int)(player.x - cameraX) - 20 + backGroundRandomX,
