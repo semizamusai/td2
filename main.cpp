@@ -36,6 +36,49 @@ int map[kMapHeight][kMapWidth] =
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
+// チュートリアル専用マップ
+const int kTutorialMapWidth = 40;
+const int kTutorialMapHeight = 23;
+
+// 0 = 空間、1 = 地面、2 = 壁、3 = 壊れる壁
+int tutorialMap[kTutorialMapHeight][kTutorialMapWidth] = {};
+
+// チュートリアルマップを初期化
+void InitTutorialMap()
+{
+    for (int y = 0; y < kTutorialMapHeight; y++)
+    {
+        for (int x = 0; x < kTutorialMapWidth; x++)
+        {
+            tutorialMap[y][x] = 0;
+
+            // 一番下を地面にする
+            if (y >= 20)
+            {
+                tutorialMap[y][x] = 1;
+            }
+        }
+    }
+
+    // プレイヤーの進行方向に壊せる壁を配置
+    for (int y = 16; y < 20; y++)
+    {
+        for (int x = 12; x < 15; x++)
+        {
+            tutorialMap[y][x] = 3;
+        }
+    }
+
+    // 少し先に通常の壁を配置
+    for (int y = 17; y < 20; y++)
+    {
+        for (int x = 25; x < 28; x++)
+        {
+            tutorialMap[y][x] = 2;
+        }
+    }
+}
+
 // Boss arena: 40 columns x 23 rows, 32 pixels per tile.
 const int kBossMapWidth = 40;
 const int kBossMapHeight = 23;
@@ -139,6 +182,75 @@ void DrawMap(float cameraX,
     }
 }
 
+// チュートリアル用マップを描画
+void DrawTutorialMap(int yukaTexture, int breakableYukaTexture)
+{
+    for (int y = 0; y < kTutorialMapHeight; ++y)
+    {
+        for (int x = 0; x < kTutorialMapWidth; ++x)
+        {
+            int tile = tutorialMap[y][x];
+
+            if (tile == 0)
+            {
+                continue;
+            }
+
+            int texture = (tile == 3)
+                ? breakableYukaTexture
+                : yukaTexture;
+
+            Novice::DrawSprite(
+                x * kTileSize,
+                y * kTileSize,
+                texture,
+                1.0f,
+                1.0f,
+                0.0f,
+                WHITE
+            );
+        }
+    }
+}
+
+// チュートリアル用の当たり判定
+bool CheckTutorialMapCollision(
+    float x,
+    float y,
+    float width,
+    float height)
+{
+    float left = x - width / 2.0f;
+    float right = x + width / 2.0f;
+    float top = y - height / 2.0f;
+    float bottom = y + height / 2.0f;
+
+    int startX = (int)floorf(left / kTileSize);
+    int endX = (int)floorf((right - 0.001f) / kTileSize);
+    int startY = (int)floorf(top / kTileSize);
+    int endY = (int)floorf((bottom - 0.001f) / kTileSize);
+
+    for (int ty = startY; ty <= endY; ++ty)
+    {
+        for (int tx = startX; tx <= endX; ++tx)
+        {
+            // マップの外側は壁として扱う
+            if (tx < 0 || tx >= kTutorialMapWidth ||
+                ty < 0 || ty >= kTutorialMapHeight)
+            {
+                return true;
+            }
+
+            if (tutorialMap[ty][tx] != 0)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 bool CheckMapCollision(
     float playerX,
     float playerY,
@@ -193,7 +305,8 @@ bool CheckMapCollision(
 enum Scene {
     SCENE_TITLE,
     SCENE_GAME,
-    SCENE_GAME2
+    SCENE_GAME2,
+    SCENE_TUTORIAL
 };
 
 enum FadeState {
@@ -529,7 +642,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
 
             // Enterキーで決定
-            if (keys[DIK_RETURN] && !preKeys[DIK_RETURN])
+            if (keys[DIK_SPACE] && !preKeys[DIK_SPACE])
             {
                 // Enterキーの効果音を再生
                 Novice::PlayAudio(enterSE, false, 1.0f);
@@ -541,7 +654,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
                 else if (titleSelect == 1)
                 {
-                    // 中央：操作説明（後から実装）
+                    // チュートリアルの初期化
+                    InitTutorialMap();
+
+                    player.x = 100.0f;
+                    player.y = 590.0f;
+
+                    velocityX = 0.0f;
+                    velocityY = 0.0f;
+                    isGround = false;
+
+                    cameraX = 0.0f;
+
+                    // 爆弾をリセット
+                    for (int i = 0; i < kBombCount; i++)
+                    {
+                        bombs[i] = Bomb{};
+                    }
+
+                    scene = SCENE_TUTORIAL;
                 }
                 else if (titleSelect == 2)
                 {
@@ -578,7 +709,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 fadeState = FADE_NONE;
             }
         }
-        if (scene == SCENE_GAME || scene == SCENE_GAME2) {
+        // チュートリアル中の操作
+        if (scene == SCENE_TUTORIAL)
+        {
+            // TABキーでタイトルに戻る（メニュー）
+            if (keys[DIK_TAB] && !preKeys[DIK_TAB])
+            {
+                scene = SCENE_TITLE;
+                titleSelect = 1;
+            }
+        }
+
+        if (scene == SCENE_GAME || scene == SCENE_GAME2 || scene == SCENE_TUTORIAL) {
             //====================
             // プレイヤー左右移動
             //====================
@@ -658,7 +800,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
           // 横方向の移動
             float nextX = player.x + velocityX;
 
-            if (!(scene == SCENE_GAME2
+            if (!(scene == SCENE_TUTORIAL
+                ? CheckTutorialMapCollision(nextX, player.y, playerWidth, playerHeight)
+                : scene == SCENE_GAME2
                 ? CheckBossMapCollision(nextX, player.y, playerWidth, playerHeight)
                 : CheckMapCollision(nextX, player.y, playerWidth, playerHeight)))
             {
@@ -672,7 +816,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // 縦方向の移動
             float nextY = player.y + velocityY;
 
-            if (!(scene == SCENE_GAME2
+            if (!(scene == SCENE_TUTORIAL
+                ? CheckTutorialMapCollision(player.x, nextY, playerWidth, playerHeight)
+                : scene == SCENE_GAME2
                 ? CheckBossMapCollision(player.x, nextY, playerWidth, playerHeight)
                 : CheckMapCollision(player.x, nextY, playerWidth, playerHeight)))
             {
@@ -776,7 +922,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                         if (nextX >= 10.0f &&
                             nextX <= kMapWidth * kTileSize - 10.0f &&
-                            !(scene == SCENE_GAME2
+                            !(scene == SCENE_TUTORIAL
+                                ? CheckTutorialMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)
+                                : scene == SCENE_GAME2
                                 ? CheckBossMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)
                                 : CheckMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)))
                         {
@@ -803,7 +951,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         float nextY = bombs[i].y + stepY;
 
                         if (nextY >= 10.0f &&
-                            !(scene == SCENE_GAME2
+                            !(scene == SCENE_TUTORIAL
+                                ? CheckTutorialMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)
+                                : scene == SCENE_GAME2
                                 ? CheckBossMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)
                                 : CheckMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)))
                         {
@@ -949,15 +1099,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             for (int checkX = minExTileX; checkX <= maxExTileX; checkX++)
                             {
                                 // マップ配列の範囲内か確認
-                                int activeMapWidth = (scene == SCENE_GAME2) ? kBossMapWidth : kMapWidth;
+                                int activeMapWidth = scene == SCENE_TUTORIAL ? kTutorialMapWidth : (scene == SCENE_GAME2 ? kBossMapWidth : kMapWidth);
+                                int activeMapHeight = scene == SCENE_TUTORIAL ? kTutorialMapHeight : kMapHeight;
                                 if (checkX < 0 || checkX >= activeMapWidth ||
-                                    checkY < 0 || checkY >= kMapHeight)
+                                    checkY < 0 || checkY >= activeMapHeight)
                                 {
                                     continue;
                                 }
 
                                 // 壊せる壁の場合
-                                if ((scene == SCENE_GAME2 ? bossMap[checkY][checkX] : map[checkY][checkX]) == 3)
+                                if ((scene == SCENE_TUTORIAL ? tutorialMap[checkY][checkX] :
+                                    (scene == SCENE_GAME2 ? bossMap[checkY][checkX] : map[checkY][checkX])) == 3)
                                 {
                                     float tileCenterX = (checkX + 0.5f) * kTileSize;
                                     float tileCenterY = (checkY + 0.5f) * kTileSize;
@@ -978,7 +1130,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                         Novice::PlayAudio(hakaiSE, false, 0.1f);
 
                                         // 壁を消す
-                                        if (scene == SCENE_GAME2) {
+                                        if (scene == SCENE_TUTORIAL) {
+                                            tutorialMap[checkY][checkX] = 0;
+                                        }
+                                        else if (scene == SCENE_GAME2) {
                                             bossMap[checkY][checkX] = 0;
                                         }
                                         else {
@@ -2107,6 +2262,122 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 boss.hp, boss.maxHp
             );
         }
+        else if (scene == SCENE_TUTORIAL)
+        {
+            // 背景
+            Novice::DrawBox(
+                0, 0, 1280, 720,
+                0.0f,
+                0x202030FF,
+                kFillModeSolid
+            );
+
+            // チュートリアル用マップを描画
+            DrawTutorialMap(
+                yukaTexture,
+                breakableYukaTexture
+            );
+
+            // 壊れたブロックのパーティクルを描画
+            for (int i = 0; i < kMaxBreakParticles; i++)
+            {
+                if (!breakParticles[i].isActive)
+                {
+                    continue;
+                }
+
+                Novice::DrawSpriteRect(
+                    (int)breakParticles[i].x,
+                    (int)breakParticles[i].y,
+                    breakParticles[i].sourceX,
+                    breakParticles[i].sourceY,
+                    8,
+                    8,
+                    breakableYukaTexture,
+                    1.0f,
+                    1.0f,
+                    0.0f,
+                    WHITE
+                );
+            }
+
+            // プレイヤーを描画
+            Novice::DrawBox(
+                (int)(player.x - playerWidth / 2.0f),
+                (int)(player.y - playerHeight / 2.0f),
+                (int)playerWidth,
+                (int)playerHeight,
+                0.0f,
+                0x00AAFFFF,
+                kFillModeSolid
+            );
+
+            // 爆弾を描画
+            for (int i = 0; i < kBombCount; i++)
+            {
+                if (!bombs[i].isActive)
+                {
+                    continue;
+                }
+
+                int bx = (int)bombs[i].x;
+                int by = (int)bombs[i].y;
+
+                if (!bombs[i].isExplosion)
+                {
+                    Novice::DrawSprite(
+                        bx - 10,
+                        by - 10,
+                        bombTexture,
+                        1.0f,
+                        1.0f,
+                        0.0f,
+                        WHITE
+                    );
+                }
+                else
+                {
+                    float progress =
+                        1.0f - (float)bombs[i].explosionTimer
+                        / explosionDuration;
+
+                    int size =
+                        (int)(explosionRadius * 2.0f * progress);
+
+                    Novice::DrawBox(
+                        bx - size / 2,
+                        by - size / 2,
+                        size,
+                        size,
+                        0.0f,
+                        0xFFAA00FF,
+                        kFillModeSolid
+                    );
+                }
+            }
+
+            // 操作説明
+            Novice::ScreenPrintf(
+                30, 20,
+                "TUTORIAL : DESTROY THE WORD SPACE!"
+            );
+
+            Novice::ScreenPrintf(
+                30, 45,
+                "A / D : MOVE"
+            );
+
+            Novice::ScreenPrintf(
+                30, 70,
+                "SPACE : PLACE BOMB"
+            );
+
+            Novice::ScreenPrintf(
+                30, 95,
+                "TAB : RETURN TO TITLE"
+            );
+        }
+
         ///
         /// ↑描画処理
         ///
