@@ -449,6 +449,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int fallingRockAttackTimer = 0;
     int fallingRockHitCooldown = 0;
 
+    // 岩纏い突進: 0=通常 1=予告 2=突進 3=硬直
+    int chargePhase = 0;
+    int chargeTimer = 0;
+    int chargeAttackTimer = 0;
+    int chargeDirection = 1;
+    int chargeHitCooldown = 0;
+    const float chargeSpeed = 18.0f;
+    const int chargeInterval = 540;
+    const int chargeWarningTime = 60;
+    const int chargeDuration = 45;
+    const int chargeRecoveryTime = 40;
+
 
     //タイトルもんげ
     int monge1 =
@@ -1184,7 +1196,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             else {
                 ++fallingRockAttackTimer;
                 // 約6秒ごとに最大4個追加。着地済みの岩は再利用しない
-                if (fallingRockAttackTimer >= 360) {
+                if (fallingRockAttackTimer >= 360 && chargePhase == 0) {
                     fallingRockAttackTimer = 0;
                     for (int spawn = 0; spawn < 4; ++spawn) {
                         int slot = -1;
@@ -1309,7 +1321,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 if (rockPhase == 0) {
                     // 既存の壁攻撃と重ならないよう、壁攻撃が終わった時だけ開始
                     ++rockAttackTimer;
-                    if (rockAttackTimer >= 420 && bossWallX < 0 &&
+                    if (rockAttackTimer >= 420 && chargePhase == 0 && bossWallX < 0 &&
                         bossWallTimer < bossWallInterval - 60) {
                         rockAttackTimer = 0;
                         rockPhase = 1;
@@ -1419,10 +1431,78 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         //====================
         if (scene == SCENE_GAME2) {
 
+            // 岩纏い突進（予告→突進→硬直）
+            if (chargeHitCooldown > 0) --chargeHitCooldown;
+            if (!boss.isAlive) {
+                chargePhase = 0;
+                chargeTimer = 0;
+                chargeAttackTimer = 0;
+            }
+            else if (chargePhase == 0) {
+                ++chargeAttackTimer;
+                bool otherAttacking = bossWallX >= 0 || rockPhase != 0;
+                for (int i = 0; i < kFallingRockCount; ++i) {
+                    if (fallingRocks[i].active && !fallingRocks[i].landed) {
+                        otherAttacking = true;
+                        break;
+                    }
+                }
+                if (chargeAttackTimer >= chargeInterval && !otherAttacking &&
+                    bossWallTimer < bossWallInterval - 100 &&
+                    rockAttackTimer < 300 && fallingRockAttackTimer < 240) {
+                    chargePhase = 1;
+                    chargeTimer = 0;
+                    chargeAttackTimer = 0;
+                    chargeDirection = player.x < boss.x ? -1 : 1;
+                    boss.velocityX = 0.0f;
+                }
+            }
+            else if (chargePhase == 1) {
+                boss.velocityX = 0.0f;
+                if (++chargeTimer >= chargeWarningTime) {
+                    chargePhase = 2;
+                    chargeTimer = 0;
+                }
+            }
+            else if (chargePhase == 2) {
+                ++chargeTimer;
+                // 高速移動でも壁をすり抜けないよう、小刻みに判定
+                bool hitWall = false;
+                for (int step = 0; step < 6; ++step) {
+                    float nextBossX = boss.x + chargeDirection * chargeSpeed / 6.0f;
+                    if (CheckBossMapCollision(nextBossX, boss.y,
+                        boss.width, boss.height)) {
+                        hitWall = true;
+                        break;
+                    }
+                    boss.x = nextBossX;
+                }
+                if (chargeHitCooldown == 0 &&
+                    fabsf(player.x - boss.x) < (playerWidth + boss.width) * 0.5f &&
+                    fabsf(player.y - boss.y) < (playerHeight + boss.height) * 0.5f) {
+                    velocityX = chargeDirection * 20.0f;
+                    velocityY = -12.0f;
+                    chargeHitCooldown = 45;
+                    shake.backGroundFlag = true;
+                    shake.duration = 10;
+                }
+                if (hitWall || chargeTimer >= chargeDuration) {
+                    chargePhase = 3;
+                    chargeTimer = 0;
+                }
+            }
+            else if (chargePhase == 3) {
+                boss.velocityX = 0.0f;
+                if (++chargeTimer >= chargeRecoveryTime) {
+                    chargePhase = 0;
+                    chargeTimer = 0;
+                }
+            }
+
             // 壁攻撃の予告・せり上がり・接触ノックバック
             if (playerWallHitCooldown > 0) --playerWallHitCooldown;
             if (boss.isAlive) {
-                ++bossWallTimer;
+                if (chargePhase == 0) ++bossWallTimer;
                 // 予告開始時に攻撃位置を確定（途中でプレイヤーが動いても追わない）
                 if (bossWallTimer == bossWallInterval) {
                     bossWallX = (int)(player.x / kTileSize);
@@ -1494,7 +1574,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 bool isAttacking =
                     isWallAttacking ||
                     isRockAttacking ||
-                    isFallingRockAttacking;
+                    isFallingRockAttacking ||
+                    chargePhase != 0;
 
                 if (isAttacking) {
 
@@ -1681,6 +1762,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             rockHitCooldown = 0;
             fallingRockAttackTimer = 0;
             fallingRockHitCooldown = 0;
+            chargePhase = 0;
+            chargeTimer = 0;
+            chargeAttackTimer = 0;
+            chargeHitCooldown = 0;
             for (int i = 0; i < kFallingRockCount; ++i) {
                 fallingRocks[i] = FallingRock{};
             }
@@ -1977,6 +2062,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     0xFFFF00FF,
                     kFillModeSolid
                 );
+
+                // ボスの周囲に岩を纏う（予告時に収束、突進時に回転）
+                if (chargePhase != 0) {
+                    const int rockCount = 12;
+                    for (int i = 0; i < rockCount; ++i) {
+                        float angle = (float)i * 6.2831853f / rockCount;
+                        float radius = 85.0f;
+                        if (chargePhase == 1) {
+                            float t = (float)chargeTimer / chargeWarningTime;
+                            radius = 120.0f - 35.0f * t;
+                        }
+                        if (chargePhase == 2) angle += chargeTimer * 0.15f;
+                        float rockX1 = boss.x + cosf(angle) * radius;
+                        float rockY1 = boss.y + sinf(angle) * radius;
+                        unsigned int rockColor = chargePhase == 2 ? 0xAAAAAAFF : 0x777777FF;
+                        Novice::DrawBox((int)rockX1 - 15, (int)rockY1 - 15,
+                            30, 30, angle, rockColor, kFillModeSolid);
+                    }
+                }
             }
 
             // HPバーの背景
