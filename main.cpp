@@ -7,7 +7,7 @@ const char kWindowTitle[] = "LC1D_03_イシダ_ノリヒコ_タイトル";
 
 const int kTileSize = 32;
 const int kMapWidth = 200;
-const int kMapHeight = 23;
+const int kMapHeight = 55;
 
 // 0 = 空間、1 = 地面、2 = 壁、3 = 壊れる壁
 int map[kMapHeight][kMapWidth] =
@@ -31,10 +31,132 @@ int map[kMapHeight][kMapWidth] =
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
+
+// ===== 探索エリア1：爆風ジャンプで登る縦穴 =====
+// 通常ステージの x=96～116 タイル付近に配置。
+// 既存の爆弾（爆風で velocityY=-25）をそのまま利用する。
+// 0=空間、2=壊れない足場。既存のマップとボス戦には影響しない。
+void InitBlastJumpArea() {
+    // 段差は128px。普通の移動では登れず、爆風ジャンプを利用する。
+    // 足場を左右交互にずらして、爆弾の設置位置を考える構造。
+    for (int x = 98; x <= 101; ++x) map[17][x] = 2; // 第1足場（上面544px）
+    for (int x = 106; x <= 109; ++x) map[13][x] = 2; // 第2足場（上面416px）
+    for (int x = 98; x <= 101; ++x) map[9][x] = 2;  // 第3足場（上面288px）
+
+    // 頂上から右側へ抜ける道。爆風ジャンプ後の着地点。
+    for (int x = 111; x <= 116; ++x) map[9][x] = 2;
+
+    // 足場の真下を通る通常ルートは残し、行き止まりにしない。
+}
+
+// ===== 探索エリア2：壊せる岩で塞がれた地下への入口 =====
+// X=139～144タイル。爆弾で岩(3)を壊すと下の地下通路へ落下できる。
+// 地下エリアを作るため、kMapHeight は35に拡張している。
+void InitBlastGapArea() {
+    // 地下全体を岩盤で埋め、そこから部屋と通路を掘る。
+    // 地上マップ(0～21行)には入口以外触れない。
+    for (int y = 22; y < kMapHeight; ++y) {
+        for (int x = 0; x < kMapWidth; ++x) map[y][x] = 1;
+    }
+
+    // 長方形の空間を掘る（両端を含む）。
+    auto carve = [](int left, int top, int right, int bottom) {
+        for (int y = top; y <= bottom; ++y) {
+            for (int x = left; x <= right; ++x) {
+                if (x >= 0 && x < kMapWidth && y >= 22 && y < kMapHeight)
+                    map[y][x] = 0;
+            }
+        }
+        };
+
+    // 地上からの入口。爆弾で破壊すると地下へ降りられる。
+    carve(139, 22, 144, 31);
+    for (int x = 139; x <= 144; ++x) {
+        map[20][x] = 3;
+        map[21][x] = 3;
+    }
+    map[20][138] = 2;
+    map[20][145] = 2;
+
+    // 地下第1層：左右へ大きく伸びる主通路と部屋。
+    carve(110, 28, 188, 33);
+    carve(116, 23, 130, 33);  // 左の大部屋
+    carve(151, 23, 168, 33);  // 中央の大部屋
+    carve(176, 25, 192, 35);  // 右の大部屋
+
+    // 地下第2層：さらに深い位置に別ルートを作る。
+    carve(105, 41, 193, 46);
+    carve(108, 36, 125, 46);  // 左の広間
+    carve(138, 38, 158, 46);  // 中央の広間
+    carve(175, 37, 193, 46);  // 右の広間
+
+    // 地下第3層：最深部。広い洞窟と横断ルート。
+    carve(117, 49, 185, 52);
+    carve(127, 46, 141, 52);
+    carve(161, 46, 178, 52);
+
+    // 各階層をつなぐ縦穴。爆風ジャンプで上に戻れる。
+    carve(119, 31, 124, 42);
+    carve(153, 31, 158, 42);
+    carve(181, 32, 186, 42);
+    carve(132, 44, 137, 50);
+    carve(169, 44, 174, 50);
+
+    // 岩の足場。プレイヤーの移動や爆風ジャンプに使う。
+    for (int x = 112; x <= 115; ++x) map[38][x] = 2;
+    for (int x = 127; x <= 130; ++x) map[37][x] = 2;
+    for (int x = 143; x <= 146; ++x) map[35][x] = 2;
+    for (int x = 163; x <= 166; ++x) map[37][x] = 2;
+    for (int x = 187; x <= 190; ++x) map[39][x] = 2;
+
+    // 隠しルート：岩を爆弾で壊すと上下の部屋がつながる。
+    for (int x = 145; x <= 148; ++x) {
+        for (int y = 34; y <= 40; ++y) map[y][x] = 3;
+    }
+    // 最深部へのもう一つの秘密の入口。
+    for (int x = 151; x <= 154; ++x) {
+        for (int y = 47; y <= 48; ++y) map[y][x] = 3;
+    }
+
+    // 落下時に最下部で着地できるよう、53～54行は岩盤のまま。
+}
+
+// ===== 地下から地上へ戻るための階段状マップチップ足場 =====
+// 爆風ジャンプで登れるように、縦穴の左右に交互に足場を置く。
+// 足場は既存の「2 = 壊れない壁」なので描画・当たり判定は共通。
+void InitUndergroundReturnPlatforms() {
+    auto addSteps = [](int left, int right, int top, int bottom) {
+        int step = 0;
+        // 3タイル(96px)間隔で足場を設置する。
+        for (int y = bottom; y >= top; y -= 3, ++step) {
+            int x = (step % 2 == 0) ? left : right - 1;
+            // 通路を塞がないように幅2タイルのみ設置する。
+            for (int dx = 0; dx < 2; ++dx) {
+                if (x + dx >= 0 && x + dx < kMapWidth &&
+                    y >= 0 && y < kMapHeight && map[y][x + dx] == 0) {
+                    map[y][x + dx] = 2;
+                }
+            }
+        }
+        };
+
+    // 地下入口：壊せる岩の真下から地上へ戻るルート。
+    // y=20,21 の壊せる岩は変更しない。
+    addSteps(139, 144, 24, 30);
+
+    // 第1層 ⇔ 第2層の3本の縦穴。
+    addSteps(119, 124, 34, 40);
+    addSteps(153, 158, 34, 40);
+    addSteps(181, 186, 34, 40);
+
+    // 第2層 ⇔ 第3層の2本の縦穴。
+    addSteps(132, 137, 46, 49);
+    addSteps(169, 174, 46, 49);
+}
 
 // チュートリアル専用マップ
 const int kTutorialMapWidth = 40;
@@ -93,15 +215,46 @@ void InitBossMap() {
     }
 }
 
-void DrawBossMap(int yukaTexture, int breakableYukaTexture) {
-    for (int y = 0; y < kBossMapHeight; ++y) {
-        for (int x = 0; x < kBossMapWidth; ++x) {
-            if (bossMap[y][x] == 0) continue;
-            int texture = bossMap[y][x] == 3 ? breakableYukaTexture : yukaTexture;
-            Novice::DrawSprite(x * kTileSize, y * kTileSize, texture,
+// Tile rendering shared by the ground, underground, tutorial and boss maps.
+// All collision geometry stays 32x32. Adjacent identical tiles can be rendered
+// as a single scaled sprite to stay under Novice's sprite-per-frame limit.
+// マップチップは必ず32x32pxで描画する。
+// 元画像全体を2倍表示すると画像サイズによって当たり判定とずれるため、
+// 32x32pxの範囲を切り出して等倍表示する。
+void DrawTileMapOptimized(const int* tiles, int width, int height,
+    float cameraX, float cameraY, int groundTexture, int breakableTexture,
+    int shakeX = 0, int shakeY = 0)
+{
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
+    int left = (int)floorf((cameraX - shakeX) / kTileSize) - 1;
+    int top = (int)floorf((cameraY - shakeY) / kTileSize) - 1;
+    int right = (int)floorf((cameraX + screenWidth - shakeX) / kTileSize) + 1;
+    int bottom = (int)floorf((cameraY + screenHeight - shakeY) / kTileSize) + 1;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right >= width) right = width - 1;
+    if (bottom >= height) bottom = height - 1;
+
+    for (int y = top; y <= bottom; ++y) {
+        for (int x = left; x <= right; ++x) {
+            int tile = tiles[y * width + x];
+            if (tile == 0) continue;
+            int sx = (int)(x * kTileSize - cameraX + shakeX);
+            int sy = (int)(y * kTileSize - cameraY + shakeY);
+            if (sx + kTileSize <= 0 || sx >= screenWidth ||
+                sy + kTileSize <= 0 || sy >= screenHeight) continue;
+            Novice::DrawSpriteRect(sx, sy, 0, 0,
+                kTileSize, kTileSize,
+                tile == 3 ? breakableTexture : groundTexture,
                 1.0f, 1.0f, 0.0f, WHITE);
         }
     }
+}
+
+void DrawBossMap(int yukaTexture, int breakableYukaTexture) {
+    DrawTileMapOptimized(&bossMap[0][0], kBossMapWidth, kBossMapHeight,
+        0.0f, 0.0f, yukaTexture, breakableYukaTexture);
 }
 
 bool CheckBossMapCollision(float x, float y, float width, float height) {
@@ -126,91 +279,19 @@ bool CheckBossMapCollision(float x, float y, float width, float height) {
 int backGroundRandomX{};;//ランダム
 int backGroundRandomY{};;//ランダム
 
-void DrawMap(float cameraX,
-    int yukaTexture,
-    int breakableYukaTexture)
+void DrawMap(float cameraX, float cameraY,
+    int yukaTexture, int breakableYukaTexture)
 {
-    for (int y = 0; y < kMapHeight; y++)
-    {
-        for (int x = 0; x < kMapWidth; x++)
-        {
-            if (map[y][x] == 0)
-            {
-                continue;
-            }
-
-            int worldX = x * kTileSize + backGroundRandomX;
-            int worldY = y * kTileSize + backGroundRandomY;
-
-            int screenX = (int)(worldX - cameraX);
-
-            // 画面外は描画しない
-            if (screenX + kTileSize < 0 ||
-                screenX > 1280)
-            {
-                continue;
-            }
-
-            Novice::DrawBox(
-                screenX,
-                worldY,
-                kTileSize,
-                kTileSize,
-                0.0f,
-                GREEN,
-                kFillModeSolid
-            );
-
-            int tileTexture = yukaTexture;
-
-
-            if (map[y][x] == 3)
-            {
-                tileTexture = breakableYukaTexture;
-            }
-
-            Novice::DrawSprite(
-                screenX,
-                worldY,
-                tileTexture,
-                1.0f,
-                1.0f,
-                0.0f,
-                WHITE
-            );
-        }
-    }
+    DrawTileMapOptimized(&map[0][0], kMapWidth, kMapHeight,
+        cameraX, cameraY, yukaTexture, breakableYukaTexture,
+        backGroundRandomX, backGroundRandomY);
 }
 
-// チュートリアル用マップを描画
 void DrawTutorialMap(int yukaTexture, int breakableYukaTexture)
 {
-    for (int y = 0; y < kTutorialMapHeight; ++y)
-    {
-        for (int x = 0; x < kTutorialMapWidth; ++x)
-        {
-            int tile = tutorialMap[y][x];
-
-            if (tile == 0)
-            {
-                continue;
-            }
-
-            int texture = (tile == 3)
-                ? breakableYukaTexture
-                : yukaTexture;
-
-            Novice::DrawSprite(
-                x * kTileSize,
-                y * kTileSize,
-                texture,
-                1.0f,
-                1.0f,
-                0.0f,
-                WHITE
-            );
-        }
-    }
+    DrawTileMapOptimized(&tutorialMap[0][0],
+        kTutorialMapWidth, kTutorialMapHeight,
+        0.0f, 0.0f, yukaTexture, breakableYukaTexture);
 }
 
 // チュートリアル用の当たり判定
@@ -443,6 +524,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
     Novice::Initialize(kWindowTitle, 1280, 720);
     InitBossMap();
+    InitBlastJumpArea(); // 通常ステージに縦穴の足場を追加
+    InitBlastGapArea(); // 通常ステージに横断用の崖を追加
+    InitUndergroundReturnPlatforms(); // 地下から戻るための階段状足場
 
     char keys[256] = { 0 };
     char preKeys[256] = { 0 };
@@ -464,6 +548,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
     // カメラ
     float cameraX = 0.0f;
+    float cameraY = 0.0f;
 
     //プレイやーの当たり判定のサイズ
     float playerWidth = 40.0f;
@@ -665,6 +750,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     isGround = false;
 
                     cameraX = 0.0f;
+                    cameraY = 0.0f;
 
                     // 爆弾をリセット
                     for (int i = 0; i < kBombCount; i++)
@@ -1833,9 +1919,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             if (cameraX < 0.0f) cameraX = 0.0f;
             const float maxCameraX = kMapWidth * kTileSize - 1280.0f;
             if (cameraX > maxCameraX) cameraX = maxCameraX;
+
+            // 縦方向も横と同じ補間で追従。上方向は余白を許可する。
+            float cameraTargetY = player.y - 360.0f;
+            const float minCameraY = -360.0f;
+            const float maxCameraY = (kMapHeight * kTileSize > 720)
+                ? (float)(kMapHeight * kTileSize - 720) : 0.0f;
+            if (cameraTargetY < minCameraY) cameraTargetY = minCameraY;
+            if (cameraTargetY > maxCameraY) cameraTargetY = maxCameraY;
+            cameraY += (cameraTargetY - cameraY) * 0.1f;
+            if (cameraY < minCameraY) cameraY = minCameraY;
+            if (cameraY > maxCameraY) cameraY = maxCameraY;
         }
         else if (scene == SCENE_GAME2) {
             cameraX = 0.0f;
+            cameraY = 0.0f;
         }
 
         // //====================
@@ -1975,7 +2073,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 kFillModeSolid
             );
 
-            DrawMap(cameraX,
+            DrawMap(cameraX, cameraY,
                 yukaTexture,
                 breakableYukaTexture);
 
@@ -1989,7 +2087,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                 Novice::DrawSpriteRect(
                     (int)(breakParticles[i].x - cameraX) + backGroundRandomX,
-                    (int)breakParticles[i].y + backGroundRandomY,
+                    (int)(breakParticles[i].y - cameraY) + backGroundRandomY,
                     breakParticles[i].sourceX,
                     breakParticles[i].sourceY,
                     8,
@@ -2005,7 +2103,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // プレイヤー
             Novice::DrawBox(
                 (int)(player.x - cameraX) - 20 + backGroundRandomX,
-                (int)player.y - 20 + backGroundRandomY,
+                (int)(player.y - cameraY) - 20 + backGroundRandomY,
                 40,
                 40,
                 0.0f,
@@ -2020,7 +2118,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 if (bombs[i].isActive)
                 {
                     int screenX = (int)(bombs[i].x - cameraX);
-                    int screenY = (int)bombs[i].y;
+                    int screenY = (int)(bombs[i].y - cameraY);
 
                     if (!bombs[i].isExplosion)
                     {
@@ -2068,7 +2166,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                     Novice::DrawEllipse(
                         (int)(enemies[j].x - cameraX),
-                        (int)enemies[j].y,
+                        (int)(enemies[j].y - cameraY),
                         radius,
                         radius,
                         0.0f,
@@ -2084,7 +2182,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 {
                     Novice::DrawBox(
                         (int)(enemies[e].x - cameraX - 20.0f) + backGroundRandomX,
-                        (int)(enemies[e].y - 20.0f) + backGroundRandomY,
+                        (int)(enemies[e].y - cameraY - 20.0f) + backGroundRandomY,
                         40, 40, 0.0f, 0xFF4444FF, kFillModeSolid
                     );
                 }
@@ -2092,7 +2190,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // プレイヤーの当たり判定の描画
             Novice::DrawBox(
                 (int)(player.x - cameraX - playerWidth / 2.0f) + backGroundRandomX,
-                (int)(player.y - playerHeight / 2.0f) + backGroundRandomY,
+                (int)(player.y - cameraY - playerHeight / 2.0f) + backGroundRandomY,
                 (int)playerWidth,
                 (int)playerHeight,
                 0.0f,
