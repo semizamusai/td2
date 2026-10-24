@@ -395,7 +395,10 @@ float editorCameraY = 0.0f;
 
 void SaveEditorMap() {
     std::ofstream file("map_data.txt");
-    if (!file.is_open()) return;
+    if (!file.is_open()) {
+        OutputDebugStringA("map_data.txt を保存できませんでした。作業フォルダを確認してください。\n");
+        return;
+    }
 
     for (int y = 0; y < kMapHeight; ++y) {
         for (int x = 0; x < kMapWidth; ++x) {
@@ -405,11 +408,15 @@ void SaveEditorMap() {
         file << '\n';
     }
     file.close();
+    OutputDebugStringA("map_data.txt を保存しました。\n");
 }
 
 void LoadEditorMap() {
     std::ifstream file("map_data.txt");
-    if (!file.is_open()) return;
+    if (!file.is_open()) {
+        OutputDebugStringA("map_data.txt が見つからないため、初期マップを使用します。\n");
+        return;
+    }
 
     for (int y = 0; y < kMapHeight; ++y) {
         for (int x = 0; x < kMapWidth; ++x) {
@@ -420,6 +427,7 @@ void LoadEditorMap() {
         }
     }
     file.close();
+    OutputDebugStringA("map_data.txt を読み込みました。\n");
 }
 
 enum Scene {
@@ -566,6 +574,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     InitBlastJumpArea(); // 通常ステージに縦穴の足場を追加
     InitBlastGapArea(); // 通常ステージに横断用の崖を追加
     InitUndergroundReturnPlatforms(); // 地下から戻るための階段状足場
+
+    // 保存済みのマップがあれば起動時に読み込む。
+    // ファイルが存在しない場合は、初期マップをそのまま使用する。
+    LoadEditorMap();
 
     char keys[256] = { 0 };
     char preKeys[256] = { 0 };
