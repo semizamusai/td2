@@ -1468,21 +1468,57 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
 
+
             if (boss.isAlive) {
 
-                // プレイヤーを追跡
-                float dx = player.x - boss.x;
+                // 壁攻撃中かどうか
+                bool isWallAttacking =
+                    bossWallX >= 0;
 
-                if (dx > 10.0f) {
-                    boss.velocityX = 2.0f;
+                // 左右の岩攻撃中かどうか
+                bool isRockAttacking =
+                    rockPhase != 0;
+
+                // 落石攻撃中かどうか
+                bool isFallingRockAttacking = false;
+
+                for (int i = 0; i < kFallingRockCount; i++) {
+                    if (fallingRocks[i].active &&
+                        !fallingRocks[i].landed) {
+                        isFallingRockAttacking = true;
+                        break;
+                    }
                 }
-                else if (dx < -10.0f) {
-                    boss.velocityX = -2.0f;
+
+                // いずれかの攻撃中なら移動停止
+                bool isAttacking =
+                    isWallAttacking ||
+                    isRockAttacking ||
+                    isFallingRockAttacking;
+
+                if (isAttacking) {
+
+                    // ボスの移動を停止
+                    boss.velocityX = 0.0f;
+
                 }
                 else {
-                    boss.velocityX = 0.0f;
+
+                    // 攻撃していない時だけプレイヤーを追跡
+                    float dx = player.x - boss.x;
+
+                    if (dx > 10.0f) {
+                        boss.velocityX = 2.0f;
+                    }
+                    else if (dx < -10.0f) {
+                        boss.velocityX = -2.0f;
+                    }
+                    else {
+                        boss.velocityX = 0.0f;
+                    }
                 }
 
+                // 座標更新
                 boss.x += boss.velocityX;
 
                 // 画面外に出さない
