@@ -679,6 +679,39 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int breakableYukaTexture =
         Novice::LoadTexture("./Resources/kowareruyuka.png");
 
+    //ボス体描画
+    int bossBodyHandles[7]{};
+    bossBodyHandles[0] = Novice::LoadTexture("./Resources/bossBody1.png");
+    bossBodyHandles[1] = Novice::LoadTexture("./Resources/bossBody2.png");
+    bossBodyHandles[2] = Novice::LoadTexture("./Resources/bossBody3.png");
+    bossBodyHandles[3] = Novice::LoadTexture("./Resources/bossBody4.png");
+    bossBodyHandles[4] = Novice::LoadTexture("./Resources/bossBody5.png");
+    bossBodyHandles[5] = Novice::LoadTexture("./Resources/bossBody6.png");
+    bossBodyHandles[6] = Novice::LoadTexture("./Resources/bossBody7.png");
+    //ボス目描画
+    int bossEyeHandles[10]{};
+    bossEyeHandles[0] = Novice::LoadTexture("./Resources/bossEye1.png");
+    bossEyeHandles[1] = Novice::LoadTexture("./Resources/bossEye2.png");
+    bossEyeHandles[2] = Novice::LoadTexture("./Resources/bossEye3.png");
+    bossEyeHandles[3] = Novice::LoadTexture("./Resources/bossEye4.png");
+    bossEyeHandles[4] = Novice::LoadTexture("./Resources/bossEye5.png");
+    bossEyeHandles[5] = Novice::LoadTexture("./Resources/bossEye6.png");
+    bossEyeHandles[6] = Novice::LoadTexture("./Resources/bossEye7.png");
+    bossEyeHandles[7] = Novice::LoadTexture("./Resources/bossEye8.png");
+    bossEyeHandles[8] = Novice::LoadTexture("./Resources/bossEye9.png");
+    bossEyeHandles[9] = Novice::LoadTexture("./Resources/bossEye10.png");
+
+    const int kBodyFPS = 80;
+    const int kEyeFPS = 150;
+    int currentBodyFrame = 0;
+    int currentEyeFrame = 0;
+
+    //後で調整
+    const int kMaxBodyAnimationFrame = 7; //ボス体の枚数
+    const int kMaxEyeAnimationFrame = 10;//ボス目の枚数
+    int currentBodyAnimationFrame = 0;//ボス体
+    int currentEyeAnimationFrame = 0;//ボス目
+
     int enterSE = Novice::LoadAudio("./Resources/ENTER.mp3");
 
     int hakaiSE = Novice::LoadAudio("./Resources/hakai.mp3");
@@ -1681,6 +1714,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
             else if (chargePhase == 0) {
                 ++chargeAttackTimer;
+
+                //=====================胴
+                //胴描画、上の処理を一行にまとめたもの
+                currentBodyFrame = ++currentBodyFrame % kBodyFPS;
+                //目描画、上の処理を一行にまとめたもの
+                currentEyeFrame = ++currentEyeFrame % kEyeFPS;
+                //現在のフレームが15フレーム以上になったら
+                if (currentBodyFrame % (kBodyFPS / kMaxBodyAnimationFrame) == 0) {
+                    //アニメーションフレームを加算
+                    currentBodyAnimationFrame++;
+                }
+                //7以上になったら
+                if (currentBodyAnimationFrame >= kMaxBodyAnimationFrame) {
+                    //0に戻す
+                    currentBodyAnimationFrame = 0;
+                }
+                //=====================↑↑↑
+                // =====================目
+                //現在のフレームが15フレーム以上になったら
+                if (currentEyeFrame % (kEyeFPS / kMaxEyeAnimationFrame) == 0) {
+                    //アニメーションフレームを加算
+                    currentEyeAnimationFrame++;
+                }
+                //10以上になったら
+                if (currentEyeAnimationFrame >= kMaxEyeAnimationFrame) {
+                    //0に戻す
+                    currentEyeAnimationFrame = 0;
+                }
+                //=====================↑↑↑
+
                 bool otherAttacking = bossWallX >= 0 || rockPhase != 0;
                 for (int i = 0; i < kFallingRockCount; ++i) {
                     if (fallingRocks[i].active && !fallingRocks[i].landed) {
@@ -2314,6 +2377,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     0.0f,
                     0xFFFF00FF,
                     kFillModeSolid
+                );
+
+                //胴
+                Novice::DrawSprite(
+                    (int)(boss.x - boss.width / 1.0f),
+                    (int)(boss.y - boss.height / 1.0f),
+                    bossBodyHandles[currentBodyAnimationFrame],
+                    1.5f,
+                    1.5f,
+                    0.0f,
+                    WHITE
+                );
+                //目
+                Novice::DrawSprite(
+                    (int)(boss.x - boss.width / 1.0f),
+                    (int)(boss.y - boss.height / 1.0f),
+                    bossEyeHandles[currentEyeAnimationFrame],
+                    1.5f,
+                    1.5f,
+                    0.0f,
+                    WHITE
                 );
 
                 // ボスの周囲に岩を纏う（予告時に収束、突進時に回転）
