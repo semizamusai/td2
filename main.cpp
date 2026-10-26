@@ -397,8 +397,10 @@ const int kRequiredItems = 5;
 int itemAnimationTimer = 0;
 const int kItemAnimationFrameCount = 4;
 const int kItemAnimationFrameDuration = 8;
-const float kDoorX = (kMapWidth - 5) * kTileSize;
-const float kDoorY = 35.0f * kTileSize - 48.0f;
+// 1つ目のコード：最後のアイテム取得位置に扉を出す
+bool isTouchingDoor = false;
+float doorX = 0.0f;
+float doorY = 0.0f;
 float editorCameraX = 0.0f;
 float editorCameraY = 0.0f;
 
@@ -669,6 +671,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     boss.isAlive = true;
     boss.damageCooldown = 0;
 
+    // Phase 1: normal boss fight. Phase 2: destroy rock armor to expose the core.
+    int bossPhase = 1;
+    const int kPhase2MaxHp = 10;
+    const int kArmorMaxHp = 12; // 岩の鎧：爆弾12回で破壊
+    const int kArmorBreakWindow = 240; // 4 seconds at 60 FPS
+    int armorHp = kArmorMaxHp;
+    int armorOpenTimer = 0;
+    int phaseChangeTimer = 0;
+
     // ボスの壊せる壁生成攻撃（60FPSで約3秒ごと）
     // 壁攻撃：予告60F → 3段せり上がり(各10F) → 次の攻撃まで待機
     int bossWallTimer = 0;
@@ -702,7 +713,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         bool falling;
         bool landed;
     };
-    const int kFallingRockCount = 16;
+    const int kFallingRockCount = 32; // 第2フェーズの広範囲落石に対応
     FallingRock fallingRocks[kFallingRockCount] = {};
     int fallingRockAttackTimer = 0;
     int fallingRockHitCooldown = 0;
@@ -856,7 +867,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     }
                 }
             }
-        } else {
+        }
+        else {
             if (scene == SCENE_TITLE && fadeState == FADE_NONE)
             {
                 // Aキーで左へ
@@ -891,7 +903,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     {
                         // 左：ゲーム開始
                         fadeState = FADE_OUT;
-                    } else if (titleSelect == 1)
+                    }
+                    else if (titleSelect == 1)
                     {
                         // チュートリアルの初期化
                         InitTutorialMap();
@@ -913,7 +926,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         }
 
                         scene = SCENE_TUTORIAL;
-                    } else if (titleSelect == 2)
+                    }
+                    else if (titleSelect == 2)
                     {
                         // 右：終了
                         break;
@@ -935,7 +949,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     scene = SCENE_GAME;
                     fadeState = FADE_IN;
                 }
-            } else if (fadeState == FADE_IN)
+            }
+            else if (fadeState == FADE_IN)
             {
 
                 // 黒を徐々に透明にする
@@ -1030,6 +1045,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 //====================
                 // 摩擦
                 //====================
+                // 地上・空中とも同じ摩擦を使い、キーを離したらすぐ減速する
                 velocityX *= frictionX;
 
                 //====================
@@ -1045,7 +1061,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     : CheckMapCollision(nextX, player.y, playerWidth, playerHeight)))
                 {
                     player.x = nextX;
-                } else
+                }
+                else
                 {
                     velocityX = 0.0f;
                 }
@@ -1061,7 +1078,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 {
                     player.y = nextY;
                     isGround = false;
-                } else
+                }
+                else
                 {
                     if (velocityY > 0.0f)
                     {
@@ -1080,16 +1098,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         for (int tx = leftTile; tx <= rightTile; ++tx) {
                             if (tx >= 0 && tx < kMapWidth && ty >= 0 && ty < kMapHeight &&
                                 map[ty][tx] == 4) {
+                                // 最後のアイテムを拾った場所を扉の出現位置にする
+                                if (collectedItems == kRequiredItems - 1) {
+                                    doorX = (float)(tx * kTileSize);
+                                    doorY = (float)(ty * kTileSize) - 32.0f;
+                                }
                                 map[ty][tx] = 0;
                                 if (collectedItems < kRequiredItems) collectedItems++;
                             }
                         }
                     }
 
-                    // 5個取得後、扉に触れるとボス戦へ移動。
-                    if (collectedItems >= kRequiredItems &&
-                        fabsf(player.x - (kDoorX + 16.0f)) < playerWidth / 2.0f + 16.0f &&
-                        fabsf(player.y - (kDoorY + 32.0f)) < playerHeight / 2.0f + 32.0f) {
+                    // 1つ目のコード：扉に触れた状態でスペースを押してボス戦へ
+                    isTouchingDoor = collectedItems >= kRequiredItems &&
+                        fabsf(player.x - (doorX + 16.0f)) < playerWidth / 2.0f + 16.0f &&
+                        fabsf(player.y - (doorY + 32.0f)) < playerHeight / 2.0f + 32.0f;
+                    if (isTouchingDoor && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
                         scene = SCENE_GAME2;
                         player.x = 200.0f;
                         player.y = 500.0f;
@@ -1100,9 +1124,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
                         boss.x = 900.0f;
                         boss.y = 580.0f;
+                        boss.maxHp = 10;
                         boss.hp = boss.maxHp;
                         boss.isAlive = true;
                         boss.damageCooldown = 0;
+                        bossPhase = 1;
+                        armorHp = kArmorMaxHp;
+                        armorOpenTimer = 0;
+                        phaseChangeTimer = 0;
                         bossWallTimer = 0;
                         bossWallX = -1;
                         bossWallRiseCount = 0;
@@ -1140,7 +1169,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             if (overlapX < overlapY) {
                                 player.x += dx < 0.0f ? -overlapX : overlapX;
                                 velocityX = 0.0f;
-                            } else {
+                            }
+                            else {
                                 player.y += dy < 0.0f ? -overlapY : overlapY;
                                 velocityY = 0.0f;
                                 if (dy < 0.0f) isGround = true;
@@ -1222,7 +1252,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             {
                                 bombs[i].x = nextX;
                                 remainingX -= stepX;
-                            } else
+                            }
+                            else
                             {
                                 bombs[i].velocityX = 0.0f;
                                 break;
@@ -1250,7 +1281,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             {
                                 bombs[i].y = nextY;
                                 remainingY -= stepY;
-                            } else
+                            }
+                            else
                             {
                                 bombs[i].velocityY = 0.0f;
                                 break;
@@ -1359,7 +1391,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             }
 
                         }
-                    } else
+                    }
+                    else
                     {
                         bombs[i].explosionTimer--;
 
@@ -1421,9 +1454,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                             // 壁を消す
                                             if (scene == SCENE_TUTORIAL) {
                                                 tutorialMap[checkY][checkX] = 0;
-                                            } else if (scene == SCENE_GAME2) {
+                                            }
+                                            else if (scene == SCENE_GAME2) {
                                                 bossMap[checkY][checkX] = 0;
-                                            } else {
+                                            }
+                                            else {
                                                 map[checkY][checkX] = 0;
                                             }
                                         }
@@ -1449,12 +1484,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         enemies[e].knockbackTimer--;
                         // 吹き飛び中は横方向の速度を緩やかに減衰
                         enemies[e].velocityX *= 0.99f;
-                    } else
+                    }
+                    else
                     {
                         float dx = player.x - enemies[e].x;
                         if (dx > 30.0f) {
                             enemies[e].velocityX += enemies[e].speed * 0.1f;
-                        } else if (dx < -30.0f) {
+                        }
+                        else if (dx < -30.0f) {
                             enemies[e].velocityX -= enemies[e].speed * 0.1f;
                         }
                         enemies[e].velocityX *= 0.9f;
@@ -1478,7 +1515,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         {
                             enemies[e].x += stepX;
                             remainingX -= stepX;
-                        } else
+                        }
+                        else
                         {
                             // 衝突直前の速度でダメージを判定
                             if (enemies[e].isKnockedBack && fabsf(enemies[e].velocityX) >= 8.0f)
@@ -1503,7 +1541,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             {
                                 enemies[e].y += stepY;
                                 remainingY -= stepY;
-                            } else
+                            }
+                            else
                             {
                                 hitVertical = true;
                                 enemies[e].velocityY = 0.0f;
@@ -1631,12 +1670,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     for (int i = 0; i < kFallingRockCount; ++i) {
                         fallingRocks[i].active = false;
                     }
-                } else {
-                    ++fallingRockAttackTimer;
+                }
+                else {
+                    // スタン中は新しい落石を発生させず、攻撃タイマーも停止する。
+                    if (!(bossPhase == 2 && armorOpenTimer > 0)) ++fallingRockAttackTimer;
                     // 約6秒ごとに最大4個追加。着地済みの岩は再利用しない
-                    if (fallingRockAttackTimer >= 360 && chargePhase == 0) {
+                    if (!(bossPhase == 2 && armorOpenTimer > 0) &&
+                        fallingRockAttackTimer >= (bossPhase == 2 ? 270 : 360) && chargePhase == 0) {
                         fallingRockAttackTimer = 0;
-                        for (int spawn = 0; spawn < 4; ++spawn) {
+                        const int fallingSpawnCount = (bossPhase == 2) ? 8 : 4;
+                        for (int spawn = 0; spawn < fallingSpawnCount; ++spawn) {
                             int slot = -1;
                             for (int i = 0; i < kFallingRockCount; ++i) {
                                 if (!fallingRocks[i].active) { slot = i; break; }
@@ -1649,7 +1692,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             r.landed = false;
                             r.y = -64.0f;
                             r.warningTimer = 55 + spawn * 12;
-                            float offset = spawn == 0 ? 0.0f : (float)(rand() % 401 - 200);
+                            // 第2フェーズはプレイヤー周辺の広い範囲へ落とす。
+                            float offset = spawn == 0 ? 0.0f :
+                                (float)(rand() % (bossPhase == 2 ? 881 : 401) - (bossPhase == 2 ? 440 : 200));
                             r.x = player.x + offset;
                             if (r.x < 80.0f) r.x = 80.0f;
                             if (r.x > 1200.0f) r.x = 1200.0f;
@@ -1754,7 +1799,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     rockPhase = 0;
                     rockLeftAlive = false;
                     rockRightAlive = false;
-                } else {
+                }
+                else if (bossPhase == 2 && armorOpenTimer > 0) {
+                    // スタン中は左右の岩攻撃を停止する。
+                    rockPhase = 0;
+                    rockPhaseTimer = 0;
+                    rockLeftAlive = false;
+                    rockRightAlive = false;
+                }
+                else {
                     if (rockPhase == 0) {
                         // 既存の壁攻撃と重ならないよう、壁攻撃が終わった時だけ開始
                         ++rockAttackTimer;
@@ -1772,11 +1825,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             rockLeftAlive = true;
                             rockRightAlive = true;
                         }
-                    } else {
+                    }
+                    else {
                         ++rockPhaseTimer;
                         if (rockPhase == 1 && rockPhaseTimer >= 60) {
                             rockPhase = 2; rockPhaseTimer = 0;
-                        } else if (rockPhase == 2) {
+                        }
+                        else if (rockPhase == 2) {
                             // 予告時のプレイヤー位置を左右から挟む。
                             // 目標は移動中に更新しない（移動で回避可能）。
                             const float rockSpeed = 12.0f;
@@ -1848,7 +1903,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                     velocityX = 15.0f; velocityY = -12.0f;
                                     rockHitCooldown = 35;
                                     shake.backGroundFlag = true;
-                                } else if (rockRightAlive && pr > rockRightX && pl < rockRightX + rockWidth) {
+                                }
+                                else if (rockRightAlive && pr > rockRightX && pl < rockRightX + rockWidth) {
                                     player.x = rockRightX - playerWidth / 2 - 1.0f;
                                     velocityX = -15.0f; velocityY = -12.0f;
                                     rockHitCooldown = 35;
@@ -1865,13 +1921,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             //====================
             if (scene == SCENE_GAME2) {
 
+                // Phase 2: armor re-forms after the exposed-core window ends.
+                if (boss.isAlive && bossPhase == 2) {
+                    if (phaseChangeTimer > 0) --phaseChangeTimer;
+                    if (armorOpenTimer > 0) {
+                        --armorOpenTimer;
+                        if (armorOpenTimer == 0) {
+                            armorHp = kArmorMaxHp;
+                        }
+                    }
+                }
+
                 // 岩纏い突進（予告→突進→硬直）
                 if (chargeHitCooldown > 0) --chargeHitCooldown;
                 if (!boss.isAlive) {
                     chargePhase = 0;
                     chargeTimer = 0;
                     chargeAttackTimer = 0;
-                } else if (chargePhase == 0) {
+                }
+                else if (bossPhase == 2 && armorOpenTimer > 0) {
+                    chargePhase = 0;
+                    boss.velocityX = 0.0f;
+                }
+                else if (chargePhase == 0) {
                     ++chargeAttackTimer;
 
                     //=====================胴
@@ -1919,13 +1991,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         chargeDirection = player.x < boss.x ? -1 : 1;
                         boss.velocityX = 0.0f;
                     }
-                } else if (chargePhase == 1) {
+                }
+                else if (chargePhase == 1) {
                     boss.velocityX = 0.0f;
                     if (++chargeTimer >= chargeWarningTime) {
                         chargePhase = 2;
                         chargeTimer = 0;
                     }
-                } else if (chargePhase == 2) {
+                }
+                else if (chargePhase == 2) {
                     ++chargeTimer;
                     // 高速移動でも壁をすり抜けないよう、小刻みに判定
                     bool hitWall = false;
@@ -1951,7 +2025,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         chargePhase = 3;
                         chargeTimer = 0;
                     }
-                } else if (chargePhase == 3) {
+                }
+                else if (chargePhase == 3) {
                     boss.velocityX = 0.0f;
                     if (++chargeTimer >= chargeRecoveryTime) {
                         chargePhase = 0;
@@ -1961,13 +2036,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                 // 壁攻撃の予告・せり上がり・接触ノックバック
                 if (playerWallHitCooldown > 0) --playerWallHitCooldown;
-                if (boss.isAlive) {
+                if (boss.isAlive && !(bossPhase == 2 && armorOpenTimer > 0)) {
                     if (chargePhase == 0) ++bossWallTimer;
                     // 予告開始時に攻撃位置を確定（途中でプレイヤーが動いても追わない）
                     if (bossWallTimer == bossWallInterval) {
                         bossWallX = (int)(player.x / kTileSize);
-                        if (bossWallX < 2) bossWallX = 2;
-                        if (bossWallX > kBossMapWidth - 3) bossWallX = kBossMapWidth - 3;
+                        // 第2フェーズは中心列から左右2列ずつ、計5列の地面攻撃。
+                        int halfWidth = (bossPhase == 2) ? 2 : 0;
+                        if (bossWallX < 2 + halfWidth) bossWallX = 2 + halfWidth;
+                        if (bossWallX > kBossMapWidth - 3 - halfWidth) bossWallX = kBossMapWidth - 3 - halfWidth;
                         bossWallRiseCount = 0;
                     }
                     if (bossWallX >= 0 && bossWallTimer >= bossWallInterval + bossWallWarning) {
@@ -1976,15 +2053,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         if (wanted > 3) wanted = 3;
                         while (bossWallRiseCount < wanted) {
                             int tileY = 19 - bossWallRiseCount; // 下から上へ
-                            if (bossMap[tileY][bossWallX] == 0) {
-                                bossMap[tileY][bossWallX] = 3;
+                            int halfWidth = (bossPhase == 2) ? 2 : 0;
+                            for (int dx = -halfWidth; dx <= halfWidth; ++dx) {
+                                int tileX = bossWallX + dx;
+                                if (tileX >= 0 && tileX < kBossMapWidth && bossMap[tileY][tileX] == 0) {
+                                    bossMap[tileY][tileX] = 3;
+                                }
                             }
                             ++bossWallRiseCount;
                         }
                         // 壁がせり上がっている間だけプレイヤーを吹き飛ばす
                         if (elapsed < 3 * bossWallRiseStep && playerWallHitCooldown == 0) {
-                            float wallLeft = bossWallX * (float)kTileSize;
-                            float wallRight = wallLeft + kTileSize;
+                            int halfWidth = (bossPhase == 2) ? 2 : 0;
+                            float wallLeft = (bossWallX - halfWidth) * (float)kTileSize;
+                            float wallRight = (bossWallX + halfWidth + 1) * (float)kTileSize;
                             float wallTop = (20 - bossWallRiseCount) * (float)kTileSize;
                             float playerLeft = player.x - playerWidth * 0.5f;
                             float playerRight = player.x + playerWidth * 0.5f;
@@ -1995,7 +2077,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                 // マップに埋まらないよう壁の上に押し出す
                                 player.y = wallTop - playerHeight * 0.5f - 0.1f;
                                 velocityY = -18.0f;
-                                velocityX = (player.x < wallLeft + 16.0f) ? -10.0f : 10.0f;
+                                velocityX = (player.x < (wallLeft + wallRight) * 0.5f) ? -10.0f : 10.0f;
                                 playerWallHitCooldown = 45;
                                 shake.backGroundFlag = true;
                             }
@@ -2037,21 +2119,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         isFallingRockAttacking ||
                         chargePhase != 0;
 
-                    if (isAttacking) {
+                    if (isAttacking || (bossPhase == 2 && armorOpenTimer > 0)) {
 
                         // ボスの移動を停止
                         boss.velocityX = 0.0f;
 
-                    } else {
+                    }
+                    else {
 
                         // 攻撃していない時だけプレイヤーを追跡
                         float dx = player.x - boss.x;
 
                         if (dx > 10.0f) {
                             boss.velocityX = 2.0f;
-                        } else if (dx < -10.0f) {
+                        }
+                        else if (dx < -10.0f) {
                             boss.velocityX = -2.0f;
-                        } else {
+                        }
+                        else {
                             boss.velocityX = 0.0f;
                         }
                     }
@@ -2073,35 +2158,70 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         boss.damageCooldown--;
                     }
 
-                    // 爆弾の爆発との当たり判定
+                    // 爆弾の爆発との当たり判定（フェーズ別）
                     if (boss.damageCooldown == 0) {
-
                         for (int i = 0; i < kBombCount; i++) {
-
-                            if (!bombs[i].isActive ||
-                                !bombs[i].isExplosion) {
-                                continue;
-                            }
-
+                            if (!bombs[i].isActive || !bombs[i].isExplosion) continue;
                             float bombDx = boss.x - bombs[i].x;
                             float bombDy = boss.y - bombs[i].y;
+                            float distance = sqrtf(bombDx * bombDx + bombDy * bombDy);
+                            float hitRadius = explosionRadius + boss.width / 2.0f;
+                            if (bossPhase == 2 && armorHp > 0) hitRadius += 25.0f;
+                            if (distance >= hitRadius) continue;
 
-                            float distance =
-                                sqrtf(bombDx * bombDx + bombDy * bombDy);
-
-                            if (distance <
-                                explosionRadius + boss.width / 2.0f) {
-
-                                boss.hp--;
-                                boss.damageCooldown = 30;
-
+                            // One hit per explosion; do not repeatedly hit during its 15 frames.
+                            boss.damageCooldown = explosionDuration + 5;
+                            if (bossPhase == 1) {
+                                --boss.hp;
+                                if (boss.hp <= 0) {
+                                    // Phase 1 defeat starts phase 2 instead of killing boss.
+                                    bossPhase = 2;
+                                    boss.hp = kPhase2MaxHp;
+                                    boss.maxHp = kPhase2MaxHp;
+                                    armorHp = kArmorMaxHp;
+                                    armorOpenTimer = 0;
+                                    phaseChangeTimer = 120;
+                                    boss.damageCooldown = 60;
+                                    shake.backGroundFlag = true;
+                                    shake.duration = 15;
+                                }
+                            }
+                            else if (armorOpenTimer > 0) {
+                                // Only the exposed core can take direct damage.
+                                --boss.hp;
                                 if (boss.hp <= 0) {
                                     boss.hp = 0;
                                     boss.isAlive = false;
                                 }
-
-                                break;
                             }
+                            else if (armorHp > 0) {
+                                --armorHp;
+                                if (armorHp <= 0) {
+                                    armorHp = 0;
+                                    armorOpenTimer = kArmorBreakWindow;
+                                    boss.damageCooldown = 45;
+                                    boss.velocityX = 0.0f;
+                                    // スタン中は全攻撃を中断。既に着地した岩は地形として残す。
+                                    chargePhase = 0;
+                                    chargeTimer = 0;
+                                    rockPhase = 0;
+                                    rockPhaseTimer = 0;
+                                    rockLeftAlive = false;
+                                    rockRightAlive = false;
+                                    bossWallTimer = 0;
+                                    bossWallX = -1;
+                                    bossWallRiseCount = 0;
+                                    for (int r = 0; r < kFallingRockCount; ++r) {
+                                        if (fallingRocks[r].active && !fallingRocks[r].landed) {
+                                            fallingRocks[r].active = false;
+                                        }
+                                    }
+                                    shake.backGroundFlag = true;
+                                    shake.duration = 12;
+                                    SpawnBreakParticles(boss.x, boss.y);
+                                }
+                            }
+                            break;
                         }
                     }
                 }
@@ -2146,7 +2266,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 cameraY += (cameraTargetY - cameraY) * 0.1f;
                 if (cameraY < minCameraY) cameraY = minCameraY;
                 if (cameraY > maxCameraY) cameraY = maxCameraY;
-            } else if (scene == SCENE_GAME2) {
+            }
+            else if (scene == SCENE_GAME2) {
                 cameraX = 0.0f;
                 cameraY = 0.0f;
             }
@@ -2256,10 +2377,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             if (titleSelect == 0)
             {
                 titleTexture = monge1;
-            } else if (titleSelect == 1)
+            }
+            else if (titleSelect == 1)
             {
                 titleTexture = monge2;
-            } else if (titleSelect == 2)
+            }
+            else if (titleSelect == 2)
             {
                 titleTexture = monge3;
             }
@@ -2274,7 +2397,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 0.0f,
                 WHITE
             );
-        } else if (scene == SCENE_GAME && mapEditorMode)
+        }
+        else if (scene == SCENE_GAME && mapEditorMode)
         {
             // マップ編集画面
             Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x202028FF, kFillModeSolid);
@@ -2284,6 +2408,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             for (int iy = 0; iy < kMapHeight; ++iy) {
                 for (int ix = 0; ix < kMapWidth; ++ix) {
                     if (map[iy][ix] == 4) {
+                        // 1つ目のコード：アイテムの32x32当たり判定を赤枠で表示
+                        Novice::DrawBox((int)(ix * kTileSize - editorCameraX),
+                            (int)(iy * kTileSize - editorCameraY),
+                            kTileSize, kTileSize, 0.0f, RED, kFillModeWireFrame);
                         Novice::DrawSpriteRect(
                             (int)(ix * kTileSize - editorCameraX),
                             (int)(iy * kTileSize - editorCameraY),
@@ -2314,7 +2442,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             Novice::ScreenPrintf(660, 8, "Selected tile: %d", editorSelectedTile);
             Novice::ScreenPrintf(660, 28, "F5: SAVE map_data.txt   F9: LOAD");
             Novice::ScreenPrintf(12, 680, "Move camera: WASD / Arrow keys   Left click: place   Right click: erase");
-        } else if (scene == SCENE_GAME)
+        }
+        else if (scene == SCENE_GAME)
         {
             //背景
             Novice::DrawBox(
@@ -2335,6 +2464,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             for (int iy = 0; iy < kMapHeight; ++iy) {
                 for (int ix = 0; ix < kMapWidth; ++ix) {
                     if (map[iy][ix] == 4) {
+                        Novice::DrawBox((int)(ix * kTileSize - cameraX) + backGroundRandomX,
+                            (int)(iy * kTileSize - cameraY) + backGroundRandomY,
+                            kTileSize, kTileSize, 0.0f, RED, kFillModeWireFrame);
                         Novice::DrawSpriteRect(
                             (int)(ix * kTileSize - cameraX) + backGroundRandomX,
                             (int)(iy * kTileSize - cameraY) + backGroundRandomY,
@@ -2346,8 +2478,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
             // 5個集めるとボス戦への扉が出現
             if (collectedItems >= kRequiredItems) {
-                int doorScreenX = (int)(kDoorX - cameraX) + backGroundRandomX;
-                int doorScreenY = (int)(kDoorY - cameraY) + backGroundRandomY;
+                int doorScreenX = (int)(doorX - cameraX) + backGroundRandomX;
+                int doorScreenY = (int)(doorY - cameraY) + backGroundRandomY;
                 Novice::DrawBox(doorScreenX, doorScreenY, 32, 64, 0.0f, 0x6633AAFF, kFillModeSolid);
                 Novice::DrawBox(doorScreenX + 5, doorScreenY + 5, 22, 59, 0.0f, 0xAA66FFFF, kFillModeSolid);
                 Novice::DrawEllipse(doorScreenX + 23, doorScreenY + 32, 2, 2, 0.0f, 0xFFFF00FF, kFillModeSolid);
@@ -2409,7 +2541,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             0.0f,
                             WHITE
                         );
-                    } else
+                    }
+                    else
                     {
                         // 爆発エフェクト
                         float progress =
@@ -2474,7 +2607,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 kFillModeWireFrame
             );
 
-        } else if (scene == SCENE_GAME2)
+        }
+        else if (scene == SCENE_GAME2)
         {
             Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x202030FF, kFillModeSolid);
             DrawBossMap(yukaTexture, breakableYukaTexture);
@@ -2489,7 +2623,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     Novice::DrawBox((int)(r.x - 32.0f), 620, 64, 20,
                         0.0f, warningColor, kFillModeSolid);
                     Novice::DrawLine((int)r.x, 0, (int)r.x, 620, 0xFF555566);
-                } else {
+                }
+                else {
                     // 64x64の岩（壊せる壁画像を4枚使用）
                     for (int ty = 0; ty < 2; ++ty) {
                         for (int tx = 0; tx < 2; ++tx) {
@@ -2533,10 +2668,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // 壁生成の予告：攻撃列を赤く点滅させる
             if (boss.isAlive && bossWallX >= 0 &&
                 bossWallTimer < bossWallInterval + bossWallWarning) {
-                int warningX = bossWallX * kTileSize;
+                int warningHalfWidth = (bossPhase == 2) ? 2 : 0;
+                int warningX = (bossWallX - warningHalfWidth) * kTileSize;
+                int warningWidth = (warningHalfWidth * 2 + 1) * kTileSize;
                 unsigned int warningColor = ((bossWallTimer / 8) % 2 == 0)
                     ? 0xFF3333AA : 0xFF333355;
-                Novice::DrawBox(warningX, 544, kTileSize, 96,
+                Novice::DrawBox(warningX, 544, warningWidth, 96,
                     0.0f, warningColor, kFillModeSolid);
                 Novice::ScreenPrintf(warningX - 8, 520, "DANGER!");
             }
@@ -2557,7 +2694,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 if (!bombs[i].isExplosion) {
                     Novice::DrawSprite(bx - 10, by - 10, bombTexture,
                         1.0f, 1.0f, 0.0f, WHITE);
-                } else {
+                }
+                else {
                     float progress = 1.0f -
                         (float)bombs[i].explosionTimer / explosionDuration;
                     int size = (int)(explosionRadius * 2.0f * progress);
@@ -2569,15 +2707,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // ボス描画
             if (boss.isAlive) {
 
-                Novice::DrawBox(
-                    (int)(boss.x - boss.width / 2.0f),
-                    (int)(boss.y - boss.height / 2.0f),
-                    (int)boss.width,
-                    (int)boss.height,
-                    0.0f,
-                    0xAA3333FF,
-                    kFillModeSolid
-                );
+                // 赤いボス本体の矩形は非表示（当たり判定は維持）
 
                 // ボスのコア
                 Novice::DrawEllipse(
@@ -2628,6 +2758,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             30, 30, angle, rockColor, kFillModeSolid);
                     }
                 }
+
+                if (bossPhase == 2) {
+                    if (armorHp > 0) {
+                        // The rock armor stays around the boss except while broken.
+                        const int totalRocks = 12;
+                        const int visibleRocks = (armorHp * totalRocks + kArmorMaxHp - 1) / kArmorMaxHp;
+                        for (int i = 0; i < visibleRocks; ++i) {
+                            float angle = (float)i * 6.2831853f / totalRocks;
+                            float radius = 88.0f;
+                            float rx = boss.x + cosf(angle) * radius;
+                            float ry = boss.y + sinf(angle) * radius;
+                            Novice::DrawBox((int)rx - 17, (int)ry - 17,
+                                34, 34, angle, 0x777777FF, kFillModeSolid);
+                        }
+                    }
+                    else {
+                        // Exposed core: bright warning ring and countdown.
+                        Novice::DrawEllipse((int)boss.x, (int)boss.y,
+                            42, 42, 0.0f, 0xFFFF33FF, kFillModeWireFrame);
+                        Novice::ScreenPrintf((int)boss.x - 55, (int)boss.y - 100,
+                            "CHANCE! %d", (armorOpenTimer + 59) / 60);
+                    }
+                }
+            }
+
+            if (boss.isAlive && bossPhase == 2) {
+                Novice::ScreenPrintf(390, 86, "PHASE 2 - ROCK ARMOR");
+                if (armorHp > 0) {
+                    Novice::ScreenPrintf(390, 108, "ARMOR: %d / %d  - BREAK WITH BOMBS", armorHp, kArmorMaxHp);
+                }
+                else {
+                    Novice::ScreenPrintf(390, 108, "CORE EXPOSED! ATTACK NOW! (%d s)", (armorOpenTimer + 59) / 60);
+                }
+                if (phaseChangeTimer > 0) Novice::ScreenPrintf(485, 170, "PHASE 2 START!");
             }
 
             // HPバーの背景
@@ -2653,7 +2817,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 "BOSS HP : %d / %d",
                 boss.hp, boss.maxHp
             );
-        } else if (scene == SCENE_TUTORIAL)
+        }
+        else if (scene == SCENE_TUTORIAL)
         {
             // 背景
             Novice::DrawBox(
@@ -2725,7 +2890,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         0.0f,
                         WHITE
                     );
-                } else
+                }
+                else
                 {
                     float progress =
                         1.0f - (float)bombs[i].explosionTimer
