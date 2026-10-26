@@ -1551,6 +1551,52 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // 落石攻撃（ボス戦）
             //====================
             if (scene == SCENE_GAME2) {
+                if (mapEditorMode && scene == SCENE_GAME) {
+                    // 編集中はプレイヤーや敵などのゲーム処理を止める
+                    int mouseX = 0;
+                    int mouseY = 0;
+                    Novice::GetMousePosition(&mouseX, &mouseY);
+
+                    // カメラ移動：WASDまたは矢印キー
+                    const float editorCameraSpeed = 12.0f;
+                    if (keys[DIK_A] || keys[DIK_LEFT]) editorCameraX -= editorCameraSpeed;
+                    if (keys[DIK_D] || keys[DIK_RIGHT]) editorCameraX += editorCameraSpeed;
+                    if (keys[DIK_W] || keys[DIK_UP]) editorCameraY -= editorCameraSpeed;
+                    if (keys[DIK_S] || keys[DIK_DOWN]) editorCameraY += editorCameraSpeed;
+
+                    const float maxEditorCameraX = (float)(kMapWidth * kTileSize - 1280);
+                    const float maxEditorCameraY = (float)(kMapHeight * kTileSize - 720);
+                    if (editorCameraX < 0.0f) editorCameraX = 0.0f;
+                    if (editorCameraY < 0.0f) editorCameraY = 0.0f;
+                    if (editorCameraX > maxEditorCameraX) editorCameraX = maxEditorCameraX;
+                    if (editorCameraY > maxEditorCameraY) editorCameraY = maxEditorCameraY;
+
+                    // 数字キーで配置するチップを選ぶ
+                    if (keys[DIK_1] && !preKeys[DIK_1]) editorSelectedTile = 0;
+                    if (keys[DIK_2] && !preKeys[DIK_2]) editorSelectedTile = 1;
+                    if (keys[DIK_3] && !preKeys[DIK_3]) editorSelectedTile = 2;
+                    if (keys[DIK_4] && !preKeys[DIK_4]) editorSelectedTile = 3;
+
+                    // Sキーで保存、Lキーで読み込み（カメラ移動とはキーが重なるため、
+                    // 保存・読み込みは画面上のボタンでも操作できるようにする）
+                    if (keys[DIK_F5] && !preKeys[DIK_F5]) SaveEditorMap();
+                    if (keys[DIK_F9] && !preKeys[DIK_F9]) LoadEditorMap();
+
+                    // 左クリックで配置、右クリックで消去。画面上部の説明欄は編集対象外。
+                    if (mouseY >= 64) {
+                        int tileX = (int)floorf((mouseX + editorCameraX) / kTileSize);
+                        int tileY = (int)floorf((mouseY + editorCameraY) / kTileSize);
+                        if (tileX >= 0 && tileX < kMapWidth &&
+                            tileY >= 0 && tileY < kMapHeight) {
+                            if (Novice::IsPressMouse(0)) {
+                                map[tileY][tileX] = editorSelectedTile;
+                            }
+                            if (Novice::IsPressMouse(1)) {
+                                map[tileY][tileX] = 0;
+                            }
+                        }
+                    }
+                }
                 if (fallingRockHitCooldown > 0) --fallingRockHitCooldown;
                 if (!boss.isAlive) {
                     for (int i = 0; i < kFallingRockCount; ++i) {
