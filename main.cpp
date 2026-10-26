@@ -10,7 +10,7 @@ const int kTileSize = 32;
 const int kMapWidth = 200;
 const int kMapHeight = 55;
 
-// 0 = 空間、1 = 地面、2 = 壁、3 = 壊れる壁
+// 0 = 空間、1 = 地面、2 = 壁、3 = 壊れる壁、4 = アイテム
 int map[kMapHeight][kMapWidth] =
 {
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -240,7 +240,7 @@ void DrawTileMapOptimized(const int* tiles, int width, int height,
     for (int y = top; y <= bottom; ++y) {
         for (int x = left; x <= right; ++x) {
             int tile = tiles[y * width + x];
-            if (tile == 0) continue;
+            if (tile == 0 || tile == 4) continue;
             int sx = (int)(x * kTileSize - cameraX + shakeX);
             int sy = (int)(y * kTileSize - cameraY + shakeY);
             if (sx + kTileSize <= 0 || sx >= screenWidth ||
@@ -360,7 +360,7 @@ bool CheckMapCollision(
                 continue;
             }
 
-            if (map[y][x] == 0)
+            if (map[y][x] == 0 || map[y][x] == 4)
             {
                 continue;
             }
@@ -387,9 +387,18 @@ bool CheckMapCollision(
 
 // ===== マップ編集モード =====
 // F1で編集開始、F2でプレイに戻る。
-// 1=空間、2=地面、3=壁、4=壊せる壁
+// 1=空間、2=地面、3=壁、4=壊せる壁、5=アイテム
 bool mapEditorMode = false;
 int editorSelectedTile = 3;
+int collectedItems = 0;
+const int kRequiredItems = 5;
+
+// アイテムアニメーション：item.png は横4コマ（各64x64）
+int itemAnimationTimer = 0;
+const int kItemAnimationFrameCount = 4;
+const int kItemAnimationFrameDuration = 8;
+const float kDoorX = (kMapWidth - 5) * kTileSize;
+const float kDoorY = 35.0f * kTileSize - 48.0f;
 float editorCameraX = 0.0f;
 float editorCameraY = 0.0f;
 
@@ -422,7 +431,7 @@ void LoadEditorMap() {
         for (int x = 0; x < kMapWidth; ++x) {
             int tile = 0;
             if (file >> tile) {
-                if (tile >= 0 && tile <= 3) map[y][x] = tile;
+                if (tile >= 0 && tile <= 4) map[y][x] = tile;
             }
         }
     }
@@ -730,6 +739,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int breakableYukaTexture =
         Novice::LoadTexture("./Resources/kowareruyuka.png");
 
+    // アイテム画像
+    int itemTexture = Novice::LoadTexture("./Resources/item.png");
+
     //ボス体描画
     int bossBodyHandles[7]{};
     bossBodyHandles[0] = Novice::LoadTexture("./Resources/bossBody1.png");
@@ -780,6 +792,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
         Novice::BeginFrame();
 
+        // 8フレームごとに次の絵へ。4コマを繰り返す。
+        itemAnimationTimer++;
+        int itemAnimationFrame = (itemAnimationTimer / kItemAnimationFrameDuration) % kItemAnimationFrameCount;
+
         memcpy(preKeys, keys, 256);
         Novice::GetHitKeyStateAll(keys);
 
@@ -819,6 +835,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             if (keys[DIK_2] && !preKeys[DIK_2]) editorSelectedTile = 1;
             if (keys[DIK_3] && !preKeys[DIK_3]) editorSelectedTile = 2;
             if (keys[DIK_4] && !preKeys[DIK_4]) editorSelectedTile = 3;
+            if (keys[DIK_5] && !preKeys[DIK_5]) editorSelectedTile = 4;
 
             // Sキーで保存、Lキーで読み込み（カメラ移動とはキーが重なるため、
             // 保存・読み込みは画面上のボタンでも操作できるようにする）
@@ -1053,6 +1070,63 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                     velocityY = 0.0f;
                 }
+                // アイテム取得（通常ステージのみ）。アイテムのタイル値は4。
+                if (scene == SCENE_GAME) {
+                    int leftTile = (int)floorf((player.x - playerWidth / 2.0f) / kTileSize);
+                    int rightTile = (int)floorf((player.x + playerWidth / 2.0f - 0.001f) / kTileSize);
+                    int topTile = (int)floorf((player.y - playerHeight / 2.0f) / kTileSize);
+                    int bottomTile = (int)floorf((player.y + playerHeight / 2.0f - 0.001f) / kTileSize);
+                    for (int ty = topTile; ty <= bottomTile; ++ty) {
+                        for (int tx = leftTile; tx <= rightTile; ++tx) {
+                            if (tx >= 0 && tx < kMapWidth && ty >= 0 && ty < kMapHeight &&
+                                map[ty][tx] == 4) {
+                                map[ty][tx] = 0;
+                                if (collectedItems < kRequiredItems) collectedItems++;
+                            }
+                        }
+                    }
+
+                    // 5個取得後、扉に触れるとボス戦へ移動。
+                    if (collectedItems >= kRequiredItems &&
+                        fabsf(player.x - (kDoorX + 16.0f)) < playerWidth / 2.0f + 16.0f &&
+                        fabsf(player.y - (kDoorY + 32.0f)) < playerHeight / 2.0f + 32.0f) {
+                        scene = SCENE_GAME2;
+                        player.x = 200.0f;
+                        player.y = 500.0f;
+                        velocityX = 0.0f;
+                        velocityY = 0.0f;
+                        cameraX = 0.0f;
+                        cameraY = 0.0f;
+                        for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
+                        boss.x = 900.0f;
+                        boss.y = 580.0f;
+                        boss.hp = boss.maxHp;
+                        boss.isAlive = true;
+                        boss.damageCooldown = 0;
+                        bossWallTimer = 0;
+                        bossWallX = -1;
+                        bossWallRiseCount = 0;
+                        playerWallHitCooldown = 0;
+                        InitBossMap();
+                        rockAttackTimer = 0;
+                        rockPhase = 0;
+                        rockPhaseTimer = 0;
+                        rockLeftX = -rockWidth;
+                        rockRightX = 1280.0f;
+                        rockTargetX = player.x;
+                        rockLeftAlive = false;
+                        rockRightAlive = false;
+                        rockHitCooldown = 0;
+                        fallingRockAttackTimer = 0;
+                        fallingRockHitCooldown = 0;
+                        chargePhase = 0;
+                        chargeTimer = 0;
+                        chargeAttackTimer = 0;
+                        chargeHitCooldown = 0;
+                        for (int i = 0; i < kFallingRockCount; ++i) fallingRocks[i] = FallingRock{};
+                    }
+                }
+
                 // 着地済みの岩は障害物：重なった場合は横へ押し出す
                 if (scene == SCENE_GAME2) {
                     for (int i = 0; i < kFallingRockCount; ++i) {
@@ -2206,6 +2280,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x202028FF, kFillModeSolid);
             DrawTileMapOptimized(&map[0][0], kMapWidth, kMapHeight,
                 editorCameraX, editorCameraY, yukaTexture, breakableYukaTexture);
+            // 配置済みアイテムを表示
+            for (int iy = 0; iy < kMapHeight; ++iy) {
+                for (int ix = 0; ix < kMapWidth; ++ix) {
+                    if (map[iy][ix] == 4) {
+                        Novice::DrawSpriteRect(
+                            (int)(ix * kTileSize - editorCameraX),
+                            (int)(iy * kTileSize - editorCameraY),
+                            itemAnimationFrame * 64, 0, 64, 64, itemTexture,
+                            0.25f, 1.25f, 0.0f, WHITE);
+                    }
+                }
+            }
 
             // マス目を表示
             int firstX = (int)(editorCameraX / kTileSize);
@@ -2224,7 +2310,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // 上部操作パネル
             Novice::DrawBox(0, 0, 1280, 64, 0.0f, 0x15151FFF, kFillModeSolid);
             Novice::ScreenPrintf(12, 8, "MAP EDITOR  |  F1: EDIT  F2: PLAY");
-            Novice::ScreenPrintf(12, 28, "1: EMPTY  2: GROUND  3: WALL  4: BREAKABLE");
+            Novice::ScreenPrintf(12, 28, "1: EMPTY  2: GROUND  3: WALL  4: BREAKABLE  5: ITEM");
             Novice::ScreenPrintf(660, 8, "Selected tile: %d", editorSelectedTile);
             Novice::ScreenPrintf(660, 28, "F5: SAVE map_data.txt   F9: LOAD");
             Novice::ScreenPrintf(12, 680, "Move camera: WASD / Arrow keys   Left click: place   Right click: erase");
@@ -2244,6 +2330,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             DrawMap(cameraX, cameraY,
                 yukaTexture,
                 breakableYukaTexture);
+
+            // 取得していないアイテムを描画
+            for (int iy = 0; iy < kMapHeight; ++iy) {
+                for (int ix = 0; ix < kMapWidth; ++ix) {
+                    if (map[iy][ix] == 4) {
+                        Novice::DrawSpriteRect(
+                            (int)(ix * kTileSize - cameraX) + backGroundRandomX,
+                            (int)(iy * kTileSize - cameraY) + backGroundRandomY,
+                            itemAnimationFrame * 64, 0, 64, 64, itemTexture,
+                            0.25f, 1.25f, 0.0f, WHITE);
+                    }
+                }
+            }
+
+            // 5個集めるとボス戦への扉が出現
+            if (collectedItems >= kRequiredItems) {
+                int doorScreenX = (int)(kDoorX - cameraX) + backGroundRandomX;
+                int doorScreenY = (int)(kDoorY - cameraY) + backGroundRandomY;
+                Novice::DrawBox(doorScreenX, doorScreenY, 32, 64, 0.0f, 0x6633AAFF, kFillModeSolid);
+                Novice::DrawBox(doorScreenX + 5, doorScreenY + 5, 22, 59, 0.0f, 0xAA66FFFF, kFillModeSolid);
+                Novice::DrawEllipse(doorScreenX + 23, doorScreenY + 32, 2, 2, 0.0f, 0xFFFF00FF, kFillModeSolid);
+            }
+            Novice::ScreenPrintf(20, 20, "ITEM: %d / %d", collectedItems, kRequiredItems);
 
             // 壊せる壁の破片を描画
             for (int i = 0; i < kMaxBreakParticles; i++)
