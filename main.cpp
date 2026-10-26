@@ -731,13 +731,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     const int chargeRecoveryTime = 40;
 
 
-    //タイトルもんげ
-    int monge1 =
-        Novice::LoadTexture("./tntn/monge1.png");
-    int monge2 =
-        Novice::LoadTexture("./tntn/monge2.png");
-    int monge3 =
-        Novice::LoadTexture("./tntn/monge3.png");
+    // タイトル画面の最背面背景
+    int usiro = Novice::LoadTexture("./Resources/usiro.png");
+
+    // 爆裂!! CHAIN POP!! タイトルロゴ
+    int bakuretu = Novice::LoadTexture("./Resources/bakuretu.png");
+    int select = Novice::LoadTexture("./Resources/select.png");
+    int startMenu = Novice::LoadTexture("./Resources/START.png");
+    int tutorialMenu = Novice::LoadTexture("./Resources/TUTORIAL.png");
+    int endMenu = Novice::LoadTexture("./Resources/END.png");
+    int titleAnimFrame = 0;
 
 
     // マップ・爆弾のテクスチャ
@@ -969,6 +972,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 if (keys[DIK_TAB] && !preKeys[DIK_TAB])
                 {
                     scene = SCENE_TITLE;
+                    titleAnimFrame = 0;
                     titleSelect = 1;
                 }
             }
@@ -2372,31 +2376,76 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         ///
         if (scene == SCENE_TITLE)
         {
-            int titleTexture = monge1;
+            // ほかのタイトル演出より先に背景を描画
+            Novice::DrawSprite(0, 0, usiro, 1.0f, 1.0f, 0.0f, WHITE);
 
-            if (titleSelect == 0)
-            {
-                titleTexture = monge1;
+            // タイトルに戻った際にも導火線演出を最初から再生
+            if (titleAnimFrame < 3600) ++titleAnimFrame;
+
+
+            // 0-120F: 導火線、120F: 爆発、以降: ロゴが弾む
+            if (titleAnimFrame < 120) {
+                // 導火線が中央に向かって燃える
+                int fuseEndX = 200 + titleAnimFrame * 4;
+                Novice::DrawLine(200, 570, fuseEndX, 570, 0x5B3925FF);
+                int sparkX = fuseEndX;
+                int sparkY = 570;
+                Novice::DrawEllipse(sparkX, sparkY, 11, 11, 0.0f, 0xFFAA20FF, kFillModeSolid);
+                Novice::DrawEllipse(sparkX, sparkY, 5, 5, 0.0f, WHITE, kFillModeSolid);
+                for (int i = 0; i < 12; ++i) {
+                    int sx = sparkX + ((i * 37 + titleAnimFrame * 3) % 65) - 32;
+                    int sy = sparkY - ((i * 29 + titleAnimFrame * 5) % 65) + 20;
+                    Novice::DrawBox(sx, sy, 3, 3, 0.0f, 0xFF9B24FF, kFillModeSolid);
+                }
             }
-            else if (titleSelect == 1)
-            {
-                titleTexture = monge2;
+            else {
+                int blastAge = titleAnimFrame - 120;
+                // 爆発時のフラッシュ、衝撃波、破片
+                if (blastAge < 24) {
+                    int radius = 20 + blastAge * 27;
+                    unsigned int blastColor = (blastAge < 7) ? 0xFFF0ADFF : 0xFF8C25FF;
+                    Novice::DrawEllipse(640, 380, radius, radius, 0.0f, blastColor, kFillModeSolid);
+                    for (int i = 0; i < 34; ++i) {
+                        float angle = (float)i * 6.2831853f / 34.0f;
+                        float distance = (float)blastAge * (9.0f + (i % 5) * 2.5f);
+                        int dx = (int)(640.0f + cosf(angle) * distance);
+                        int dy = (int)(380.0f + sinf(angle) * distance);
+                        Novice::DrawBox(dx, dy, 5 + i % 4 * 4, 5 + i % 3 * 4,
+                            0.0f, (i % 3 == 0) ? 0xFFA13DFF : 0x55483FFF, kFillModeSolid);
+                    }
+                }
+                // 爆発の直後に拡大して現れ、徐々に通常サイズに落ち着く
+                if (blastAge >= 7) {
+                    float scale = 1.0f;
+                    if (blastAge < 27) {
+                        float t = (float)(blastAge - 7) / 20.0f;
+                        scale = 1.22f - 0.22f * t + 0.09f * sinf(t * 9.42478f) * (1.0f - t);
+                    }
+                    int logoX = (int)(640.0f - 640.0f * scale);
+                    int logoY = (int)(360.0f - 360.0f * scale);
+                    // 爆発直後の画面揺れ
+                    if (blastAge < 23) {
+                        int shakeSize = (23 - blastAge) / 3;
+                        logoX += (blastAge % 2 == 0) ? shakeSize : -shakeSize;
+                        logoY += (blastAge % 3 == 0) ? -shakeSize : shakeSize;
+                    }
+                    Novice::DrawSprite(logoX, logoY, bakuretu, scale, scale, 0.0f, WHITE);
+                }
             }
-            else if (titleSelect == 2)
-            {
-                titleTexture = monge3;
+            // ロゴ画像は黒背景なので、既存の選択肢を画面下に再描画
+            if (titleAnimFrame >= 150) {
+                // START / TUTORIAL / END の画像は、ボタン以外が透過PNG。
+                // DrawSpriteRectで下部を切り抜かず、画像全体を等倍描画する。
+                // 透過部分にはロゴがそのまま見える。
+                int menuImage = startMenu;
+                if (titleSelect == 1) menuImage = tutorialMenu;
+                if (titleSelect == 2) menuImage = endMenu;
+                Novice::DrawSprite(0, 0, menuImage, 1.0f, 1.0f, 0.0f, WHITE);
+                if ((titleAnimFrame / 30) % 2 == 0) {
+                    Novice::DrawSprite(0, 0, select, 1.0f, 1.0f, 0.0f, WHITE);
+                }
             }
 
-            // 選択状態に応じて画像を切り替える
-            Novice::DrawSprite(
-                0,
-                0,
-                titleTexture,
-                1.0f,
-                1.0f,
-                0.0f,
-                WHITE
-            );
         }
         else if (scene == SCENE_GAME && mapEditorMode)
         {
