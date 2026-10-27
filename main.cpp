@@ -747,6 +747,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int tutorialMenu = Novice::LoadTexture("./Resources/TUTORIAL.png");
     int endMenu = Novice::LoadTexture("./Resources/END.png");
     int titleAnimFrame = 0;
+    // タイトルで20秒無操作なら爆弾が現れ、爆発後に終了（60FPS想定）
+    const int kTitleIdleLimit = 20 * 60;
+    const int kIdleBombFuse = 90;
+    const int kIdleBombExplosion = 45;
+    int titleIdleFrames = 0;
+    int idleBombFrames = -1; // -1: 未発動
+    int lastMouseX = 0, lastMouseY = 0;
+    Novice::GetMousePosition(&lastMouseX, &lastMouseY);
 
 
     // マップ・爆弾のテクスチャ
@@ -819,6 +827,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         memcpy(preKeys, keys, 256);
         Novice::GetHitKeyStateAll(keys);
 
+        // キーボード・マウス移動・クリックを操作として扱う。
+        // 爆弾が現れた後は操作しても演出を止めない。
+        int titleMouseX = 0, titleMouseY = 0;
+        Novice::GetMousePosition(&titleMouseX, &titleMouseY);
+        bool titleInput = (titleMouseX != lastMouseX || titleMouseY != lastMouseY)
+            || Novice::IsPressMouse(0) || Novice::IsPressMouse(1);
+        lastMouseX = titleMouseX;
+        lastMouseY = titleMouseY;
+        for (int key = 0; key < 256; ++key) {
+            if (keys[key]) { titleInput = true; break; }
+        }
+        if (scene == SCENE_TITLE) {
+            if (idleBombFrames < 0) {
+                if (titleInput) titleIdleFrames = 0;
+                else if (++titleIdleFrames >= kTitleIdleLimit) idleBombFrames = 0;
+            }
+            else {
+                ++idleBombFrames;
+            }
+        }
+        else {
+            titleIdleFrames = 0;
+            idleBombFrames = -1;
+        }
+
         // F1で編集モード、F2でゲームプレイに戻る（通常ステージのみ）
         if (scene == SCENE_GAME && keys[DIK_F1] && !preKeys[DIK_F1]) {
             mapEditorMode = true;
@@ -878,7 +911,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
         }
         else {
-            if (scene == SCENE_TITLE && fadeState == FADE_NONE)
+            if (scene == SCENE_TITLE && fadeState == FADE_NONE && idleBombFrames < 0)
             {
                 // Aキーで左へ
                 if (keys[DIK_A] && !preKeys[DIK_A])
@@ -2485,6 +2518,52 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
 
+            // 無操作時の爆弾演出をタイトルの最前面に表示
+            if (idleBombFrames >= 0) {
+                const int bombX = 640, bombY = 425;
+                if (idleBombFrames < kIdleBombFuse) {
+                    // 上から落下してバウンドする爆弾
+                   
+                    float dropY = 0.0f;
+                    if (idleBombFrames < 30) {
+                        float u = (float)idleBombFrames / 30.0f;
+                        dropY = -460.0f * (1.0f - u * u);
+                    }
+                    else {
+                        float bounce = expf(-(idleBombFrames - 30) * 0.065f);
+                        dropY = -60.0f * fabsf(sinf((idleBombFrames - 30) * 0.19f)) * bounce;
+                    }
+                    int y = bombY + (int)dropY;
+                    Novice::DrawEllipse(bombX, y, 66, 66, 0.0f, 0x171717FF, kFillModeSolid);
+                    Novice::DrawEllipse(bombX - 19, y - 20, 16, 12, 0.0f, 0x666666FF, kFillModeSolid);
+                    Novice::DrawLine(bombX + 10, y - 60, bombX + 30, y - 92, 0xE7B87CFF);
+                    int spark = idleBombFrames % 8;
+                    Novice::DrawEllipse(bombX + 30, y - 94, 8 + spark, 8 + spark, 0.0f,
+                        (idleBombFrames / 6) % 2 ? 0xFF3A00FF : 0xFFFF33FF, kFillModeSolid);
+                    if ((idleBombFrames / 10) % 2 == 0)
+                        Novice::DrawEllipse(bombX, y, 72, 72, 0.0f, 0xFF5522FF, kFillModeWireFrame);
+                }
+                else {
+                    int age = idleBombFrames - kIdleBombFuse;
+                    int radius = 45 + age * 35;
+                    if (radius > 1800) radius = 1800;
+                    Novice::DrawEllipse(bombX, bombY, radius, radius, 0.0f,
+                        age < 14 ? 0xFFFFB0FF : 0xFF6A12FF, kFillModeSolid);
+                    for (int i = 0; i < 72; ++i) {
+                        float angle = i * 6.2831853f / 72.0f;
+                        float distance = age * (12.0f + (i % 7) * 3.0f);
+                        int px = bombX + (int)(cosf(angle) * distance);
+                        int py = bombY + (int)(sinf(angle) * distance);
+                        Novice::DrawBox(px, py, 6 + i % 4 * 4, 6 + i % 3 * 4,
+                            0.0f, i % 3 ? 0xFF9B24FF : 0xFFF4A0FF, kFillModeSolid);
+                    }
+                    if (age < 12) {
+                        unsigned int alpha = (unsigned int)((12 - age) * 18);
+                        Novice::DrawBox(0, 0, 1280, 720, 0.0f,
+                            0xFFFFFF00 | alpha, kFillModeSolid);
+                    }
+                }
+            }
         }
         else if (scene == SCENE_GAME && mapEditorMode)
         {
@@ -3181,6 +3260,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         // ブレンド設定を元に戻す
         Novice::SetBlendMode(BlendMode::kBlendModeNormal);
         Novice::EndFrame();
+
+        // 爆発演出を最後まで見せてから通常の終了処理へ
+        if (scene == SCENE_TITLE && idleBombFrames >= kIdleBombFuse + kIdleBombExplosion) {
+            break;
+        }
 
         if (preKeys[DIK_ESCAPE] == 0 && keys[DIK_ESCAPE] != 0) {
             break;
