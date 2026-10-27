@@ -597,6 +597,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     srand((unsigned int)time(nullptr));
 
     Novice::Initialize(kWindowTitle, 1280, 720);
+    // ボス撃破後のクリア背景（1280x720）
+    int clearBackgroundTexture = Novice::LoadTexture("./Resources/A1.png");
+    int endingA2Texture = Novice::LoadTexture("./Resources/A2_overlay.png");
+    int endingA3Texture = Novice::LoadTexture("./Resources/A3_overlay.png");
+    int endingA4Texture = Novice::LoadTexture("./Resources/A4_overlay.png");
     InitBossMap();
     InitBlastJumpArea(); // 通常ステージに縦穴の足場を追加
     InitBlastGapArea(); // 通常ステージに横断用の崖を追加
@@ -605,6 +610,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     // 保存済みのマップがあれば起動時に読み込む。
     // ファイルが存在しない場合は、初期マップをそのまま使用する。
     LoadEditorMap();
+
+    // プレイ開始時のマップを保存。クリア後は破壊した壁・取得したアイテムを復元する。
+    int initialMap[kMapHeight][kMapWidth];
+    memcpy(initialMap, map, sizeof(map));
 
     char keys[256] = { 0 };
     char preKeys[256] = { 0 };
@@ -674,6 +683,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     const float bombKnockBack = 20.0f;
 
     bool isGround = false;
+
+    // スポーン時に壁・床と重なっていたら、安全な空間まで上へ補正する。
+    auto ResolveSpawnPosition = [&](Scene targetScene) {
+        auto collides = [&](float x, float y) {
+            if (targetScene == SCENE_TUTORIAL)
+                return CheckTutorialMapCollision(x, y, playerWidth, playerHeight);
+            if (targetScene == SCENE_GAME2)
+                return CheckBossMapCollision(x, y, playerWidth, playerHeight);
+            return CheckMapCollision(x, y, playerWidth, playerHeight);
+            };
+        // 地面の上で止めるため、足元が接触していない場所を探す。
+        if (collides(player.x, player.y)) {
+            for (int step = 1; step <= 720; ++step) {
+                float candidateY = player.y - (float)step;
+                if (candidateY < playerHeight * 0.5f) break;
+                if (!collides(player.x, candidateY)) {
+                    player.y = candidateY;
+                    break;
+                }
+            }
+        }
+        velocityY = 0.0f;
+        isGround = false;
+        };
+
 
     Shake shake;
     shake.duration = 2;//揺れの時間
@@ -791,10 +825,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
     // タイトル画面の最背面背景
     int usiro = Novice::LoadTexture("./Resources/usiro.png");
-
-    // チュートリアル背景画像
-    int tutorialBgTexture =
-        Novice::LoadTexture("./Resources/tyutoriaruBg.png");
+    int tutorialBgTexture = Novice::LoadTexture("./Resources/tyutoriaruBg.png");
 
     // 爆裂!! CHAIN POP!! タイトルロゴ
     int bakuretu = Novice::LoadTexture("./Resources/bakuretu.png");
@@ -820,11 +851,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int bombTexture =
         Novice::LoadTexture("./Resources/bomb.png");
 
-    // ボス攻撃予告の「！」画像
-    int bossWarningTexture =
-        Novice::LoadTexture("./Resources/!.png");
-
     // プレイヤーの爆弾が爆発したときの文字画像（128x64）
+    int bossWarningTexture = Novice::LoadTexture("./Resources/!.png");
     int boomTexture = Novice::LoadTexture("./Resources/BOOM.png");
 
     int breakableYukaTexture =
@@ -843,9 +871,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         Novice::LoadTexture("./Resources/five.png")   // 5/5
     };
 
-    int chanceTexture = Novice::LoadTexture("./Resources/chance.png");
-
     // 固定砲台の画像（32x32 PNG）
+    int chanceTexture = Novice::LoadTexture("./Resources/chance.png");
     int turretTexture = Novice::LoadTexture("./Resources/enemy1.png");
 
     //ボス体描画
@@ -919,6 +946,83 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int bossBgm2 = Novice::LoadAudio("./Resources/ryunomai.mp3");
     int bossBgm2Voice = -1;
 
+    auto ResetGameState = [&]() {
+        // ゲーム全体を初期状態へ戻す（リトライ・クリア共通）
+        memcpy(map, initialMap, sizeof(map));
+        InitTutorialMap();
+        InitBossMap();
+        player = { 640.0f, 300.0f };
+        velocityX = 0.0f;
+        velocityY = 0.0f;
+        isGround = false;
+        playerHP = kPlayerMaxHP;
+        playerDamageCooldown = 0;
+        cameraX = 0.0f;
+        cameraY = 0.0f;
+        collectedItems = 0;
+        isTouchingDoor = false;
+        doorX = 0.0f;
+        doorY = 0.0f;
+        itemAnimationTimer = 0;
+        mapEditorMode = false;
+        editorCameraX = 0.0f;
+        editorCameraY = 0.0f;
+        spawnedEnemies = 0;
+        for (int i = 0; i < kEnemyCount; ++i) enemies[i] = Enemy{};
+        for (int i = 0; i < kMaxBreakParticles; ++i) breakParticles[i] = BreakParticle{};
+        for (int i = 0; i < kTurretShotCount; ++i) turretShots[i] = TurretShot{};
+        const float turretPositions[kTurretCount] = { 800.0f, 1600.0f, 2560.0f, 3840.0f, 5120.0f };
+        const int turretCooldowns[kTurretCount] = { 50, 85, 30, 100, 70 };
+        for (int i = 0; i < kTurretCount; ++i) {
+            turrets[i] = { turretPositions[i], 608.0f, 3, turretCooldowns[i], -1.0f, 0.0f, true };
+        }
+        turretHitCooldown = 0;
+        boss = {};
+        boss.x = 900.0f;
+        boss.y = 580.0f;
+        boss.width = 120.0f;
+        boss.height = 120.0f;
+        boss.hp = 10;
+        boss.maxHp = 10;
+        boss.isAlive = true;
+        bossPhase = 1;
+        armorHp = kArmorMaxHp;
+        armorOpenTimer = 0;
+        phaseChangeTimer = 0;
+        transformTimer = 0;
+        bossWallTimer = 0;
+        bossWallX = -1;
+        bossWallRiseCount = 0;
+        playerWallHitCooldown = 0;
+        rockAttackTimer = 0;
+        rockPhase = 0;
+        rockPhaseTimer = 0;
+        rockLeftX = -rockWidth;
+        rockRightX = 1280.0f;
+        rockTargetX = 640.0f;
+        rockLeftAlive = false;
+        rockRightAlive = false;
+        rockHitCooldown = 0;
+        fallingRockAttackTimer = 0;
+        fallingRockHitCooldown = 0;
+        for (int i = 0; i < kFallingRockCount; ++i) fallingRocks[i] = FallingRock{};
+        chargePhase = 0;
+        chargeTimer = 0;
+        chargeAttackTimer = 0;
+        chargeDirection = 1;
+        chargeHitCooldown = 0;
+        shake.backGroundFlag = false;
+        backGroundRandomX = 0;
+        backGroundRandomY = 0;
+        betrayalTimer = -1;
+        bossDeathTimer = 0;
+        betrayalBombX = betrayalBombY = 0.0f;
+        betrayalStartX = betrayalStartY = 0.0f;
+        betrayalTargetX = betrayalTargetY = 0.0f;
+        for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
+        ResolveSpawnPosition(SCENE_GAME);
+        };
+
     while (Novice::ProcessMessage() == 0) {
 
         Novice::BeginFrame();
@@ -983,28 +1087,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 bgmVoice = Novice::PlayAudio(bgm, true, 0.5f);
             }
 
-            // HPを回復
-            playerHP = kPlayerMaxHP;
-            playerDamageCooldown = 0;
-
-            // プレイヤーの位置を初期化
-            player.x = 640.0f;
-            player.y = 300.0f;
-
-            // 速度をリセット
-            velocityX = 0.0f;
-            velocityY = 0.0f;
-            isGround = false;
-
-            // カメラをリセット
-            cameraX = 0.0f;
-            cameraY = 0.0f;
-
-            // 爆弾をすべて消す
-            for (int i = 0; i < kBombCount; i++)
-            {
-                bombs[i] = Bomb{};
-            }
+            // クリア後と同じ完全初期化を行う。
+            ResetGameState();
 
             // 通常ステージに戻る
             scene = SCENE_GAME;
@@ -1109,6 +1193,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                             player.x = 100.0f;
                             player.y = 590.0f;
+                            ResolveSpawnPosition(SCENE_TUTORIAL);
 
                             velocityX = 0.0f;
                             velocityY = 0.0f;
@@ -1145,6 +1230,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         fadeAlpha = 255;
                         // 暗転したらゲーム画面に切り替える 
                         scene = SCENE_GAME;
+                        ResolveSpawnPosition(SCENE_GAME);
                         fadeState = FADE_IN;
                     }
                 }
@@ -1282,9 +1368,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     {
                         if (velocityY > 0.0f)
                         {
+                            // 着地位置を1pxずつ探して、床の上に正確に止める。
+                            // 既に壁に重なっている場合はスポーン補正も適用する。
+                            auto hitFloor = [&](float y) {
+                                return scene == SCENE_TUTORIAL
+                                    ? CheckTutorialMapCollision(player.x, y, playerWidth, playerHeight)
+                                    : scene == SCENE_GAME2
+                                    ? CheckBossMapCollision(player.x, y, playerWidth, playerHeight)
+                                    : CheckMapCollision(player.x, y, playerWidth, playerHeight);
+                                };
+                            if (hitFloor(player.y)) {
+                                ResolveSpawnPosition(scene);
+                            }
+                            else {
+                                float safeY = player.y;
+                                for (float y = player.y + 1.0f; y <= nextY; y += 1.0f) {
+                                    if (hitFloor(y)) break;
+                                    safeY = y;
+                                }
+                                player.y = safeY;
+                            }
                             isGround = true;
                         }
-
                         velocityY = 0.0f;
                     }
                     // アイテム取得（通常ステージのみ）。アイテムのタイル値は4。
@@ -1323,6 +1428,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                             player.x = 200.0f;
                             player.y = 500.0f;
+                            ResolveSpawnPosition(SCENE_GAME2);
                             velocityX = 0.0f;
                             velocityY = 0.0f;
                             cameraX = 0.0f;
@@ -2241,7 +2347,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             betrayalTargetY = player.y;
                         }
                     }
-                    if (betrayalTimer >= 0 && betrayalTimer < 300) {
+                    if (betrayalTimer >= 0 && betrayalTimer < 675) {
                         ++betrayalTimer;
                         // 40F待機→110Fかけてプレイヤーの近くまで接近
                         if (betrayalTimer >= 40 && betrayalTimer <= 150) {
@@ -2252,8 +2358,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         }
                     }
 
-                    // 裏切り爆弾の爆発と暗転が終わったらSPACEでタイトルへ戻る。
-                    if (betrayalTimer >= 300 && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
+                    // A4のフェードインが完了してからSPACEでタイトルへ戻る。
+                    if (betrayalTimer >= 675 && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
                         if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
                         if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
                         if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
@@ -2265,9 +2371,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         idleBombFrames = -1;
                         fadeState = FADE_NONE;
                         fadeAlpha = 0;
-                        betrayalTimer = -1;
-                        bossDeathTimer = 0;
-                        for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
+                        ResetGameState();
                     }
 
                     // Phase 2: armor re-forms after the exposed-core window ends.
@@ -2730,6 +2834,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                     player.x = 200.0f;
                     player.y = 500.0f;
+                    ResolveSpawnPosition(SCENE_GAME2);
 
                     velocityX = 0.0f;
                     velocityY = 0.0f;
@@ -3240,18 +3345,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     0.0f, c, kFillModeSolid);
                 Novice::DrawBox((int)(rockTargetX - 3.0f), (int)rockY,
                     6, (int)rockHeight, 0.0f, c, kFillModeSolid);
-                // 左右の岩攻撃の予告に「！」を表示
-                Novice::DrawSprite(
-                    55, 455,
-                    bossWarningTexture,
-                    1.0f, 1.0f, 0.0f, WHITE
-                );
-
-                Novice::DrawSprite(
-                    1135, 455,
-                    bossWarningTexture,
-                    1.0f, 1.0f, 0.0f, WHITE
-                );
+                Novice::DrawSprite(30, 455, bossWarningTexture, 1.0f, 1.0f, 0.0f, WHITE);
+                Novice::DrawSprite(1110, 455, bossWarningTexture, 1.0f, 1.0f, 0.0f, WHITE);
             }
             // 岩の本体：壊せる壁と同じテクスチャを3列×5段で描画
             if (rockPhase == 2) {
@@ -3278,13 +3373,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     ? 0xFF3333AA : 0xFF333355;
                 Novice::DrawBox(warningX, 544, warningWidth, 96,
                     0.0f, warningColor, kFillModeSolid);
-                // 壁攻撃の予告に「！」を表示
-                Novice::DrawSprite(
-                    warningX + warningWidth / 2 - 16,
-                    520,
-                    bossWarningTexture,
-                    1.0f, 1.0f, 0.0f, WHITE
-                );
+                Novice::DrawSprite(warningX - 8, 520, bossWarningTexture, 1.0f, 1.0f, 0.0f, WHITE);
             }
 
 
@@ -3421,23 +3510,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         // Exposed core: bright warning ring and countdown.
                         Novice::DrawEllipse((int)boss.x, (int)boss.y,
                             42, 42, 0.0f, 0xFFFF33FF, kFillModeWireFrame);
-                        // CHANCE!画像を表示
-                        Novice::DrawSprite(
-                            (int)boss.x - 80,
-                            (int)boss.y - 120,
-                            chanceTexture,
-                            1.0f, 1.0f,
-                            0.0f,
-                            0xFFFFFFFF
-                        );
-
-                        // 残り時間を表示
-                        Novice::ScreenPrintf(
-                            (int)boss.x - 20,
-                            (int)boss.y - 75,
-                            "%d",
-                            (armorOpenTimer + 59) / 60
-                        );
+                        Novice::DrawSprite((int)boss.x - 55, (int)boss.y - 100, chanceTexture, 1.0f, 1.0f, 0.0f, WHITE);
                     }
                 }
             }
@@ -3558,6 +3631,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
                 }
             }
+            // ボス撃破アニメーション終了後は、クリア背景を画面全体に表示する。
+            // この位置なら、後続の裏切り爆弾エンディング演出は背景の手前に描画される。
+            if (!boss.isAlive && bossPhase == 2 && bossDeathTimer == 0 && betrayalTimer < 0) {
+                Novice::DrawSprite(0, 0, clearBackgroundTexture, 1.0f, 1.0f, 0.0f, WHITE);
+            }
             if (!boss.isAlive && bossPhase == 2 && bossDeathTimer == 0 && betrayalTimer < 0) {
                 Novice::ScreenPrintf(544, 235, "BOSS DEFEATED!");
                 Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
@@ -3611,15 +3689,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         }
                     }
                 }
-                else {
-                    // オチの後は暗転したまま（ゲームを勝手に終了させない）
-                    Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x000000FF, kFillModeSolid);
-                    Novice::ScreenPrintf(520, 320, "THE END ...?");
-                    Novice::ScreenPrintf(480, 350, "BETRAYED BY YOUR BOMB!");
-                    if (t >= 300 && (t / 30) % 2 == 0) {
-                        Novice::ScreenPrintf(480, 405, "PRESS SPACE TO TITLE");
-                    }
-                }
+                // t>=255 のエンディング画像は、HPバーの後に最前面で描画する。
+
             }
 
             // HPバーの背景
@@ -3646,19 +3717,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 boss.hp, boss.maxHp
             );
 
-        }
-       else if (scene == SCENE_TUTORIAL)
-       {
-           // チュートリアル背景
-           Novice::DrawSprite(
-               0, 0,
-               tutorialBgTexture,
-               1.0f, 1.0f,
-               0.0f,
-               WHITE
-           );
+            // 爆発終了後、A1を背景にしてA2～A4を順番にフェードインする。
+            // 各文字は60フレーム(約1秒)かけて透明度0→255になる。
+            // 既に表示された文字はそのまま残る。
+            if (betrayalTimer >= 255) {
+                Novice::DrawSprite(0, 0, clearBackgroundTexture, 1.0f, 1.0f, 0.0f, WHITE);
 
-           // ここから下の処理は、今のコードを残す
+                const int kEndingFadeFrames = 60;
+                auto DrawEndingFade = [&](int texture, int startFrame) {
+                    int elapsed = betrayalTimer - startFrame;
+                    if (elapsed < 0) return;
+                    int alpha = elapsed * 255 / kEndingFadeFrames;
+                    if (alpha > 255) alpha = 255;
+                    // Noviceのカラーは0xRRGGBBAA。末尾AAで透明度を指定。
+                    unsigned int tint = 0xFFFFFF00u | (unsigned int)alpha;
+                    Novice::DrawSprite(0, 0, texture, 1.0f, 1.0f, 0.0f, tint);
+                    };
+
+                DrawEndingFade(endingA2Texture, 375); // A2: 2秒後からフェードイン
+                DrawEndingFade(endingA3Texture, 495); // A3: さらに2秒後
+                DrawEndingFade(endingA4Texture, 615); // A4: さらに2秒後
+            }
+
+
+        }
+        else if (scene == SCENE_TUTORIAL)
+        {
+            // チュートリアル背景
+            Novice::DrawSprite(0, 0, tutorialBgTexture, 1.0f, 1.0f, 0.0f, WHITE);
+
             // チュートリアル用マップを描画
             DrawTutorialMap(
                 yukaTexture,
@@ -3753,6 +3840,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
 
+            // 操作説明
+            Novice::ScreenPrintf(
+                30, 20,
+                "TUTORIAL : DESTROY THE WORD SPACE!"
+            );
+
+            Novice::ScreenPrintf(
+                30, 45,
+                "A / D : MOVE"
+            );
+
+            Novice::ScreenPrintf(
+                30, 70,
+                "SPACE : PLACE BOMB"
+            );
+
+            Novice::ScreenPrintf(
+                30, 95,
+                "TAB : RETURN TO TITLE"
+            );
         }
         else if (scene == SCENE_GAMEOVER)
         {
