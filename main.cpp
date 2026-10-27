@@ -679,6 +679,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int armorHp = kArmorMaxHp;
     int armorOpenTimer = 0;
     int phaseChangeTimer = 0;
+    // 第二形態への変身演出（3秒）：岩を吸い寄せて鎧を作る
+    const int kTransformDuration = 180;
+    int transformTimer = 0;
 
     // ボスの壊せる壁生成攻撃（60FPSで約3秒ごと）
     // 壁攻撃：予告60F → 3段せり上がり(各10F) → 次の攻撃まで待機
@@ -1136,6 +1139,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         armorHp = kArmorMaxHp;
                         armorOpenTimer = 0;
                         phaseChangeTimer = 0;
+                        transformTimer = 0;
                         bossWallTimer = 0;
                         bossWallX = -1;
                         bossWallRiseCount = 0;
@@ -1677,9 +1681,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
                 else {
                     // スタン中は新しい落石を発生させず、攻撃タイマーも停止する。
-                    if (!(bossPhase == 2 && armorOpenTimer > 0)) ++fallingRockAttackTimer;
+                    if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) ++fallingRockAttackTimer;
                     // 約6秒ごとに最大4個追加。着地済みの岩は再利用しない
-                    if (!(bossPhase == 2 && armorOpenTimer > 0) &&
+                    if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) &&
                         fallingRockAttackTimer >= (bossPhase == 2 ? 270 : 360) && chargePhase == 0) {
                         fallingRockAttackTimer = 0;
                         const int fallingSpawnCount = (bossPhase == 2) ? 8 : 4;
@@ -1804,7 +1808,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     rockLeftAlive = false;
                     rockRightAlive = false;
                 }
-                else if (bossPhase == 2 && armorOpenTimer > 0) {
+                else if (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) {
                     // スタン中は左右の岩攻撃を停止する。
                     rockPhase = 0;
                     rockPhaseTimer = 0;
@@ -1927,6 +1931,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                 // Phase 2: armor re-forms after the exposed-core window ends.
                 if (boss.isAlive && bossPhase == 2) {
+                    if (transformTimer > 0) {
+                        --transformTimer;
+                        boss.velocityX = 0.0f;
+                    }
                     if (phaseChangeTimer > 0) --phaseChangeTimer;
                     if (armorOpenTimer > 0) {
                         --armorOpenTimer;
@@ -1943,7 +1951,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     chargeTimer = 0;
                     chargeAttackTimer = 0;
                 }
-                else if (bossPhase == 2 && armorOpenTimer > 0) {
+                else if (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) {
                     chargePhase = 0;
                     boss.velocityX = 0.0f;
                 }
@@ -2040,7 +2048,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                 // 壁攻撃の予告・せり上がり・接触ノックバック
                 if (playerWallHitCooldown > 0) --playerWallHitCooldown;
-                if (boss.isAlive && !(bossPhase == 2 && armorOpenTimer > 0)) {
+                if (boss.isAlive && !(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) {
                     if (chargePhase == 0) ++bossWallTimer;
                     // 予告開始時に攻撃位置を確定（途中でプレイヤーが動いても追わない）
                     if (bossWallTimer == bossWallInterval) {
@@ -2123,7 +2131,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         isFallingRockAttacking ||
                         chargePhase != 0;
 
-                    if (isAttacking || (bossPhase == 2 && armorOpenTimer > 0)) {
+                    if (isAttacking || (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) {
 
                         // ボスの移動を停止
                         boss.velocityX = 0.0f;
@@ -2163,7 +2171,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     }
 
                     // 爆弾の爆発との当たり判定（フェーズ別）
-                    if (boss.damageCooldown == 0) {
+                    if (boss.damageCooldown == 0 && transformTimer == 0) {
                         for (int i = 0; i < kBombCount; i++) {
                             if (!bombs[i].isActive || !bombs[i].isExplosion) continue;
                             float bombDx = boss.x - bombs[i].x;
@@ -2184,7 +2192,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                     boss.maxHp = kPhase2MaxHp;
                                     armorHp = kArmorMaxHp;
                                     armorOpenTimer = 0;
-                                    phaseChangeTimer = 120;
+                                    phaseChangeTimer = kTransformDuration;
+                                    transformTimer = kTransformDuration;
+                                    // 変身中は既存の攻撃を中断
+                                    boss.velocityX = 0.0f;
+                                    chargePhase = 0;
+                                    chargeTimer = 0;
+                                    rockPhase = 0;
+                                    rockPhaseTimer = 0;
+                                    rockLeftAlive = false;
+                                    rockRightAlive = false;
+                                    bossWallTimer = 0;
+                                    bossWallX = -1;
+                                    bossWallRiseCount = 0;
+                                    for (int r = 0; r < kFallingRockCount; ++r) {
+                                        if (!fallingRocks[r].landed) fallingRocks[r].active = false;
+                                    }
                                     boss.damageCooldown = 60;
                                     shake.backGroundFlag = true;
                                     shake.duration = 15;
@@ -2809,7 +2832,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
 
                 if (bossPhase == 2) {
-                    if (armorHp > 0) {
+                    if (transformTimer > 0) {
+                        // 外側から12個の岩が回転しながら集まる
+                        float progress = (float)(kTransformDuration - transformTimer) / kTransformDuration;
+                        float gather = (progress - 0.22f) / 0.68f;
+                        if (gather < 0.0f) gather = 0.0f;
+                        if (gather > 1.0f) gather = 1.0f;
+                        gather = gather * gather * (3.0f - 2.0f * gather);
+                        float radius = 290.0f - 202.0f * gather;
+                        for (int i = 0; i < 12; ++i) {
+                            float angle = i * 6.2831853f / 12.0f + (1.0f - gather) * progress * 7.0f;
+                            float rx = boss.x + cosf(angle) * radius;
+                            float ry = boss.y + sinf(angle) * radius;
+                            Novice::DrawBox((int)rx - 17, (int)ry - 17,
+                                34, 34, angle, 0x888888FF, kFillModeSolid);
+                        }
+                        // コアの脈動・衝撃波
+                        int pulse = 30 + (int)(8.0f * sinf(progress * 40.0f));
+                        Novice::DrawEllipse((int)boss.x, (int)boss.y, pulse, pulse,
+                            0.0f, 0xFFCC33FF, kFillModeWireFrame);
+                        if (transformTimer < 25) {
+                            int wave = (25 - transformTimer) * 9;
+                            Novice::DrawEllipse((int)boss.x, (int)boss.y, wave, wave,
+                                0.0f, 0xFFAA44FF, kFillModeWireFrame);
+                        }
+                    }
+                    else if (armorHp > 0) {
                         // The rock armor stays around the boss except while broken.
                         const int totalRocks = 12;
                         const int visibleRocks = (armorHp * totalRocks + kArmorMaxHp - 1) / kArmorMaxHp;
@@ -2840,7 +2888,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 else {
                     Novice::ScreenPrintf(390, 108, "CORE EXPOSED! ATTACK NOW! (%d s)", (armorOpenTimer + 59) / 60);
                 }
-                if (phaseChangeTimer > 0) Novice::ScreenPrintf(485, 170, "PHASE 2 START!");
+                if (transformTimer > 0) {
+                    Novice::ScreenPrintf(480, 170, "ROCK ARMOR FORMING... %d%%",
+                        (kTransformDuration - transformTimer) * 100 / kTransformDuration);
+                }
             }
 
             // HPバーの背景
