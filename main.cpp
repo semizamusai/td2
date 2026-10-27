@@ -816,6 +816,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int bombTexture =
         Novice::LoadTexture("./Resources/bomb.png");
 
+    // プレイヤーの爆弾が爆発したときの文字画像（128x64）
+    int boomTexture = Novice::LoadTexture("./Resources/BOOM.png");
+
     int breakableYukaTexture =
         Novice::LoadTexture("./Resources/kowareruyuka.png");
 
@@ -1001,916 +1004,876 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         /// ↓更新処理
         ///
         if (scene != SCENE_GAMEOVER) {
-        // ダメージ後の無敵時間を減らす
-        if (playerDamageCooldown > 0) {
-            playerDamageCooldown--;
-        }
-
-        if (mapEditorMode && scene == SCENE_GAME) {
-            // 編集中はプレイヤーや敵などのゲーム処理を止める
-            int mouseX = 0;
-            int mouseY = 0;
-            Novice::GetMousePosition(&mouseX, &mouseY);
-
-            // カメラ移動：WASDまたは矢印キー
-            const float editorCameraSpeed = 12.0f;
-            if (keys[DIK_A] || keys[DIK_LEFT]) editorCameraX -= editorCameraSpeed;
-            if (keys[DIK_D] || keys[DIK_RIGHT]) editorCameraX += editorCameraSpeed;
-            if (keys[DIK_W] || keys[DIK_UP]) editorCameraY -= editorCameraSpeed;
-            if (keys[DIK_S] || keys[DIK_DOWN]) editorCameraY += editorCameraSpeed;
-
-            const float maxEditorCameraX = (float)(kMapWidth * kTileSize - 1280);
-            const float maxEditorCameraY = (float)(kMapHeight * kTileSize - 720);
-            if (editorCameraX < 0.0f) editorCameraX = 0.0f;
-            if (editorCameraY < 0.0f) editorCameraY = 0.0f;
-            if (editorCameraX > maxEditorCameraX) editorCameraX = maxEditorCameraX;
-            if (editorCameraY > maxEditorCameraY) editorCameraY = maxEditorCameraY;
-
-            // 数字キーで配置するチップを選ぶ
-            if (keys[DIK_1] && !preKeys[DIK_1]) editorSelectedTile = 0;
-            if (keys[DIK_2] && !preKeys[DIK_2]) editorSelectedTile = 1;
-            if (keys[DIK_3] && !preKeys[DIK_3]) editorSelectedTile = 2;
-            if (keys[DIK_4] && !preKeys[DIK_4]) editorSelectedTile = 3;
-            if (keys[DIK_5] && !preKeys[DIK_5]) editorSelectedTile = 4;
-
-            // Sキーで保存、Lキーで読み込み（カメラ移動とはキーが重なるため、
-            // 保存・読み込みは画面上のボタンでも操作できるようにする）
-            if (keys[DIK_F5] && !preKeys[DIK_F5]) SaveEditorMap();
-            if (keys[DIK_F9] && !preKeys[DIK_F9]) LoadEditorMap();
-
-            // 左クリックで配置、右クリックで消去。画面上部の説明欄は編集対象外。
-            if (mouseY >= 64) {
-                int tileX = (int)floorf((mouseX + editorCameraX) / kTileSize);
-                int tileY = (int)floorf((mouseY + editorCameraY) / kTileSize);
-                if (tileX >= 0 && tileX < kMapWidth &&
-                    tileY >= 0 && tileY < kMapHeight) {
-                    if (Novice::IsPressMouse(0)) {
-                        map[tileY][tileX] = editorSelectedTile;
-                    }
-                    if (Novice::IsPressMouse(1)) {
-                        map[tileY][tileX] = 0;
-                    }
-                }
+            // ダメージ後の無敵時間を減らす
+            if (playerDamageCooldown > 0) {
+                playerDamageCooldown--;
             }
-        }
-        else {
-            if (scene == SCENE_TITLE && fadeState == FADE_NONE && idleBombFrames < 0)
-            {
-                // Aキーで左へ
-                if (keys[DIK_A] && !preKeys[DIK_A])
-                {
-                    titleSelect--;
 
-                    if (titleSelect < 0)
-                    {
-                        titleSelect = 2;
-                    }
-                }
+            if (mapEditorMode && scene == SCENE_GAME) {
+                // 編集中はプレイヤーや敵などのゲーム処理を止める
+                int mouseX = 0;
+                int mouseY = 0;
+                Novice::GetMousePosition(&mouseX, &mouseY);
 
-                // Dキーで右へ
-                if (keys[DIK_D] && !preKeys[DIK_D])
-                {
-                    titleSelect++;
+                // カメラ移動：WASDまたは矢印キー
+                const float editorCameraSpeed = 12.0f;
+                if (keys[DIK_A] || keys[DIK_LEFT]) editorCameraX -= editorCameraSpeed;
+                if (keys[DIK_D] || keys[DIK_RIGHT]) editorCameraX += editorCameraSpeed;
+                if (keys[DIK_W] || keys[DIK_UP]) editorCameraY -= editorCameraSpeed;
+                if (keys[DIK_S] || keys[DIK_DOWN]) editorCameraY += editorCameraSpeed;
 
-                    if (titleSelect > 2)
-                    {
-                        titleSelect = 0;
-                    }
-                }
+                const float maxEditorCameraX = (float)(kMapWidth * kTileSize - 1280);
+                const float maxEditorCameraY = (float)(kMapHeight * kTileSize - 720);
+                if (editorCameraX < 0.0f) editorCameraX = 0.0f;
+                if (editorCameraY < 0.0f) editorCameraY = 0.0f;
+                if (editorCameraX > maxEditorCameraX) editorCameraX = maxEditorCameraX;
+                if (editorCameraY > maxEditorCameraY) editorCameraY = maxEditorCameraY;
 
-                // Enterキーで決定
-                if (keys[DIK_SPACE] && !preKeys[DIK_SPACE])
-                {
-                    // Enterキーの効果音を再生
-                    Novice::PlayAudio(enterSE, false, 1.0f);
+                // 数字キーで配置するチップを選ぶ
+                if (keys[DIK_1] && !preKeys[DIK_1]) editorSelectedTile = 0;
+                if (keys[DIK_2] && !preKeys[DIK_2]) editorSelectedTile = 1;
+                if (keys[DIK_3] && !preKeys[DIK_3]) editorSelectedTile = 2;
+                if (keys[DIK_4] && !preKeys[DIK_4]) editorSelectedTile = 3;
+                if (keys[DIK_5] && !preKeys[DIK_5]) editorSelectedTile = 4;
 
-                    if (titleSelect == 0)
-                    {
-                        // 左：ゲーム開始
-                        fadeState = FADE_OUT;
-                    }
-                    else if (titleSelect == 1)
-                    {
-                        // チュートリアルの初期化
-                        InitTutorialMap();
+                // Sキーで保存、Lキーで読み込み（カメラ移動とはキーが重なるため、
+                // 保存・読み込みは画面上のボタンでも操作できるようにする）
+                if (keys[DIK_F5] && !preKeys[DIK_F5]) SaveEditorMap();
+                if (keys[DIK_F9] && !preKeys[DIK_F9]) LoadEditorMap();
 
-                        player.x = 100.0f;
-                        player.y = 590.0f;
-
-                        velocityX = 0.0f;
-                        velocityY = 0.0f;
-                        isGround = false;
-
-                        cameraX = 0.0f;
-                        cameraY = 0.0f;
-
-                        // 爆弾をリセット
-                        for (int i = 0; i < kBombCount; i++)
-                        {
-                            bombs[i] = Bomb{};
+                // 左クリックで配置、右クリックで消去。画面上部の説明欄は編集対象外。
+                if (mouseY >= 64) {
+                    int tileX = (int)floorf((mouseX + editorCameraX) / kTileSize);
+                    int tileY = (int)floorf((mouseY + editorCameraY) / kTileSize);
+                    if (tileX >= 0 && tileX < kMapWidth &&
+                        tileY >= 0 && tileY < kMapHeight) {
+                        if (Novice::IsPressMouse(0)) {
+                            map[tileY][tileX] = editorSelectedTile;
                         }
-
-                        scene = SCENE_TUTORIAL;
-                    }
-                    else if (titleSelect == 2)
-                    {
-                        // 右：終了
-                        break;
+                        if (Novice::IsPressMouse(1)) {
+                            map[tileY][tileX] = 0;
+                        }
                     }
                 }
             }
-
-            // フェード処理
-            if (fadeState == FADE_OUT)
-            {
-
-                // 黒を徐々に濃くする
-                fadeAlpha += fadeSpeed;
-
-                if (fadeAlpha >= 255)
+            else {
+                if (scene == SCENE_TITLE && fadeState == FADE_NONE && idleBombFrames < 0)
                 {
-                    fadeAlpha = 255;
-                    // 暗転したらゲーム画面に切り替える 
-                    scene = SCENE_GAME;
-                    fadeState = FADE_IN;
-                }
-            }
-            else if (fadeState == FADE_IN)
-            {
-
-                // 黒を徐々に透明にする
-                fadeAlpha -= fadeSpeed;
-
-                if (fadeAlpha <= 0)
-                {
-                    fadeAlpha = 0;
-                    fadeState = FADE_NONE;
-                }
-            }
-            // チュートリアル中の操作
-            if (scene == SCENE_TUTORIAL)
-            {
-                // TABキーでタイトルに戻る（メニュー）
-                if (keys[DIK_TAB] && !preKeys[DIK_TAB])
-                {
-                    scene = SCENE_TITLE;
-                    titleAnimFrame = 0;
-                    titleSelect = 1;
-                }
-            }
-
-            if (scene == SCENE_GAME || scene == SCENE_GAME2 || scene == SCENE_TUTORIAL) {
-                //====================
-                // プレイヤー左右移動
-                //====================
-
-                 // X方向に候補を並べ、各地点の地面の上に配置する
-                for (int x = 160; scene == SCENE_GAME && x < kMapWidth * kTileSize - 40 && spawnedEnemies < kEnemyCount; x += 80)
-                {
-                    for (int y = (kMapHeight - 1) * kTileSize - 20; y >= 20; y -= 4)
+                    // Aキーで左へ
+                    if (keys[DIK_A] && !preKeys[DIK_A])
                     {
-                        float spawnX = (float)x;
-                        float spawnY = (float)y;
-                        // 敵の全身が空間内、足元に床がある位置だけ採用
-                        if (CheckMapCollision(spawnX, spawnY, enemySize, enemySize) ||
-                            !CheckMapCollision(spawnX, spawnY + 2.0f, enemySize, enemySize))
+                        titleSelect--;
+
+                        if (titleSelect < 0)
                         {
-                            continue;
+                            titleSelect = 2;
                         }
-                        // プレイヤーの初期位置付近には置かない
-                        if (fabsf(spawnX - player.x) < 640.0f && fabsf(spawnY - player.y) < 400.0f)
+                    }
+
+                    // Dキーで右へ
+                    if (keys[DIK_D] && !preKeys[DIK_D])
+                    {
+                        titleSelect++;
+
+                        if (titleSelect > 2)
                         {
-                            continue;
+                            titleSelect = 0;
                         }
-                        // 敵同士が初期状態で重ならないようにする
-                        bool overlaps = false;
-                        for (int j = 0; j < spawnedEnemies; ++j)
+                    }
+
+                    // Enterキーで決定
+                    if (keys[DIK_SPACE] && !preKeys[DIK_SPACE])
+                    {
+                        // Enterキーの効果音を再生
+                        Novice::PlayAudio(enterSE, false, 1.0f);
+
+                        if (titleSelect == 0)
                         {
-                            if (fabsf(enemies[j].x - spawnX) < enemySize + 4.0f &&
-                                fabsf(enemies[j].y - spawnY) < enemySize + 4.0f)
+                            // 左：ゲーム開始
+                            fadeState = FADE_OUT;
+                        }
+                        else if (titleSelect == 1)
+                        {
+                            // チュートリアルの初期化
+                            InitTutorialMap();
+
+                            player.x = 100.0f;
+                            player.y = 590.0f;
+
+                            velocityX = 0.0f;
+                            velocityY = 0.0f;
+                            isGround = false;
+
+                            cameraX = 0.0f;
+                            cameraY = 0.0f;
+
+                            // 爆弾をリセット
+                            for (int i = 0; i < kBombCount; i++)
                             {
-                                overlaps = true;
-                                break;
+                                bombs[i] = Bomb{};
                             }
+
+                            scene = SCENE_TUTORIAL;
                         }
-                        if (overlaps) continue;
-
-                        Enemy& e = enemies[spawnedEnemies++];
-                        e.x = spawnX;
-                        e.y = spawnY;
-                        e.speed = 2.0f;
-                        e.isAlive = true;
-                        e.isKnockedBack = false;
-                        e.knockbackTimer = 0;
-                        break;
-                    }
-                }
-
-                // Dキーで右移動
-                if (keys[DIK_D]) {
-                    velocityX += accelerationX;
-                }
-
-                // Aキーで左移動
-                if (keys[DIK_A]) {
-                    velocityX -= accelerationX;
-                }
-
-                //====================
-                // 重力処理
-                //====================
-
-                // 毎フレーム下方向に加速
-                velocityY += gravity;
-
-                // 最大落下速度を制限
-                if (velocityY > maxFallSpeed) {
-                    velocityY = maxFallSpeed;
-                }
-
-                //====================
-                // 摩擦
-                //====================
-                // 地上・空中とも同じ摩擦を使い、キーを離したらすぐ減速する
-                velocityX *= frictionX;
-
-                //====================
-                // 座標更新
-                //====================
-              // 横方向の移動
-                float nextX = player.x + velocityX;
-
-                if (!(scene == SCENE_TUTORIAL
-                    ? CheckTutorialMapCollision(nextX, player.y, playerWidth, playerHeight)
-                    : scene == SCENE_GAME2
-                    ? CheckBossMapCollision(nextX, player.y, playerWidth, playerHeight)
-                    : CheckMapCollision(nextX, player.y, playerWidth, playerHeight)))
-                {
-                    player.x = nextX;
-                }
-                else
-                {
-                    velocityX = 0.0f;
-                }
-
-                // 縦方向の移動
-                float nextY = player.y + velocityY;
-
-                if (!(scene == SCENE_TUTORIAL
-                    ? CheckTutorialMapCollision(player.x, nextY, playerWidth, playerHeight)
-                    : scene == SCENE_GAME2
-                    ? CheckBossMapCollision(player.x, nextY, playerWidth, playerHeight)
-                    : CheckMapCollision(player.x, nextY, playerWidth, playerHeight)))
-                {
-                    player.y = nextY;
-                    isGround = false;
-                }
-                else
-                {
-                    if (velocityY > 0.0f)
-                    {
-                        isGround = true;
-                    }
-
-                    velocityY = 0.0f;
-                }
-                // アイテム取得（通常ステージのみ）。アイテムのタイル値は4。
-                if (scene == SCENE_GAME) {
-                    int leftTile = (int)floorf((player.x - playerWidth / 2.0f) / kTileSize);
-                    int rightTile = (int)floorf((player.x + playerWidth / 2.0f - 0.001f) / kTileSize);
-                    int topTile = (int)floorf((player.y - playerHeight / 2.0f) / kTileSize);
-                    int bottomTile = (int)floorf((player.y + playerHeight / 2.0f - 0.001f) / kTileSize);
-                    for (int ty = topTile; ty <= bottomTile; ++ty) {
-                        for (int tx = leftTile; tx <= rightTile; ++tx) {
-                            if (tx >= 0 && tx < kMapWidth && ty >= 0 && ty < kMapHeight &&
-                                map[ty][tx] == 4) {
-                                // 最後のアイテムを拾った場所を扉の出現位置にする
-                                if (collectedItems == kRequiredItems - 1) {
-                                    doorX = (float)(tx * kTileSize);
-                                    doorY = (float)(ty * kTileSize) - 32.0f;
-                                }
-                                map[ty][tx] = 0;
-                                if (collectedItems < kRequiredItems) collectedItems++;
-                            }
-                        }
-                    }
-
-                    // 1つ目のコード：扉に触れた状態でスペースを押してボス戦へ
-                    isTouchingDoor = collectedItems >= kRequiredItems &&
-                        fabsf(player.x - (doorX + 16.0f)) < playerWidth / 2.0f + 16.0f &&
-                        fabsf(player.y - (doorY + 32.0f)) < playerHeight / 2.0f + 32.0f;
-                    if (isTouchingDoor && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
-                        // BGMは再生ハンドルで停止する（音源IDでは停止できない）
-                        if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
-                        if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
-                        if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
-                        bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
-
-                        scene = SCENE_GAME2;
-
-                        player.x = 200.0f;
-                        player.y = 500.0f;
-                        velocityX = 0.0f;
-                        velocityY = 0.0f;
-                        cameraX = 0.0f;
-                        cameraY = 0.0f;
-                        for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
-                        boss.x = 900.0f;
-                        boss.y = 580.0f;
-                        boss.maxHp = 10;
-                        boss.hp = boss.maxHp;
-                        boss.isAlive = true;
-                        boss.damageCooldown = 0;
-                        bossPhase = 1;
-                        armorHp = kArmorMaxHp;
-                        armorOpenTimer = 0;
-                        phaseChangeTimer = 0;
-                        transformTimer = 0;
-                        bossDeathTimer = 0;
-                        betrayalTimer = -1;
-                        bossWallTimer = 0;
-                        bossWallX = -1;
-                        bossWallRiseCount = 0;
-                        playerWallHitCooldown = 0;
-                        InitBossMap();
-                        rockAttackTimer = 0;
-                        rockPhase = 0;
-                        rockPhaseTimer = 0;
-                        rockLeftX = -rockWidth;
-                        rockRightX = 1280.0f;
-                        rockTargetX = player.x;
-                        rockLeftAlive = false;
-                        rockRightAlive = false;
-                        rockHitCooldown = 0;
-                        fallingRockAttackTimer = 0;
-                        fallingRockHitCooldown = 0;
-                        chargePhase = 0;
-                        chargeTimer = 0;
-                        chargeAttackTimer = 0;
-                        chargeHitCooldown = 0;
-                        for (int i = 0; i < kFallingRockCount; ++i) fallingRocks[i] = FallingRock{};
-                    }
-                }
-
-                // 着地済みの岩は障害物：重なった場合は横へ押し出す
-                if (scene == SCENE_GAME2) {
-                    for (int i = 0; i < kFallingRockCount; ++i) {
-                        const FallingRock& r = fallingRocks[i];
-                        if (!r.active || !r.landed) continue;
-                        float dx = player.x - r.x;
-                        float dy = player.y - r.y;
-                        float overlapX = playerWidth * 0.5f + 32.0f - fabsf(dx);
-                        float overlapY = playerHeight * 0.5f + 32.0f - fabsf(dy);
-                        if (overlapX > 0.0f && overlapY > 0.0f) {
-                            if (overlapX < overlapY) {
-                                player.x += dx < 0.0f ? -overlapX : overlapX;
-                                velocityX = 0.0f;
-                            }
-                            else {
-                                player.y += dy < 0.0f ? -overlapY : overlapY;
-                                velocityY = 0.0f;
-                                if (dy < 0.0f) isGround = true;
-                            }
-                        }
-                    }
-                }
-
-                //====================
-               // 爆弾の設置
-               //====================
-                if (keys[DIK_SPACE] && !preKeys[DIK_SPACE])
-                {
-                    for (int i = 0; i < kBombCount; i++)
-                    {
-                        if (!bombs[i].isActive)
+                        else if (titleSelect == 2)
                         {
-                            bombs[i].x = player.x;
-                            bombs[i].y = player.y + 10;
-
-                            bombs[i].velocityX = 0.0f;
-                            bombs[i].velocityY = 0.0f;
-
-                            bombs[i].timer = bombFuseTime;
-                            bombs[i].isActive = true;
-                            bombs[i].isExplosion = false;
-                            bombs[i].explosionTimer = 0;
-
+                            // 右：終了
                             break;
                         }
                     }
                 }
-            }
-            //====================
-            // 爆弾の更新
-            //====================
-            for (int i = 0; i < kBombCount; i++)
-            {
-                if (bombs[i].isActive)
+
+                // フェード処理
+                if (fadeState == FADE_OUT)
                 {
-                    if (!bombs[i].isExplosion)
+
+                    // 黒を徐々に濃くする
+                    fadeAlpha += fadeSpeed;
+
+                    if (fadeAlpha >= 255)
                     {
+                        fadeAlpha = 255;
+                        // 暗転したらゲーム画面に切り替える 
+                        scene = SCENE_GAME;
+                        fadeState = FADE_IN;
+                    }
+                }
+                else if (fadeState == FADE_IN)
+                {
 
-                        //====================
-                        // 爆弾の物理処理
-                        //====================
+                    // 黒を徐々に透明にする
+                    fadeAlpha -= fadeSpeed;
 
-                        // 重力
-                        bombs[i].velocityY += 0.6f;
+                    if (fadeAlpha <= 0)
+                    {
+                        fadeAlpha = 0;
+                        fadeState = FADE_NONE;
+                    }
+                }
+                // チュートリアル中の操作
+                if (scene == SCENE_TUTORIAL)
+                {
+                    // TABキーでタイトルに戻る（メニュー）
+                    if (keys[DIK_TAB] && !preKeys[DIK_TAB])
+                    {
+                        scene = SCENE_TITLE;
+                        titleAnimFrame = 0;
+                        titleSelect = 1;
+                    }
+                }
 
-                        // 最大落下速度
-                        if (bombs[i].velocityY > 15.0f)
+                if (scene == SCENE_GAME || scene == SCENE_GAME2 || scene == SCENE_TUTORIAL) {
+                    //====================
+                    // プレイヤー左右移動
+                    //====================
+
+                     // X方向に候補を並べ、各地点の地面の上に配置する
+                    for (int x = 160; scene == SCENE_GAME && x < kMapWidth * kTileSize - 40 && spawnedEnemies < kEnemyCount; x += 80)
+                    {
+                        for (int y = (kMapHeight - 1) * kTileSize - 20; y >= 20; y -= 4)
                         {
-                            bombs[i].velocityY = 15.0f;
-                        }
-
-                        // 横方向の摩擦
-                        bombs[i].velocityX *= 0.98f;
-
-                        // 横方向の移動と壁判定
-                        float remainingX = bombs[i].velocityX;
-
-                        while (fabsf(remainingX) > 0.001f)
-                        {
-                            float stepX = remainingX;
-
-                            if (stepX > 4.0f) stepX = 4.0f;
-                            if (stepX < -4.0f) stepX = -4.0f;
-
-                            float nextX = bombs[i].x + stepX;
-
-                            if (nextX >= 10.0f &&
-                                nextX <= kMapWidth * kTileSize - 10.0f &&
-                                !(scene == SCENE_TUTORIAL
-                                    ? CheckTutorialMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)
-                                    : scene == SCENE_GAME2
-                                    ? CheckBossMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)
-                                    : CheckMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)))
+                            float spawnX = (float)x;
+                            float spawnY = (float)y;
+                            // 敵の全身が空間内、足元に床がある位置だけ採用
+                            if (CheckMapCollision(spawnX, spawnY, enemySize, enemySize) ||
+                                !CheckMapCollision(spawnX, spawnY + 2.0f, enemySize, enemySize))
                             {
-                                bombs[i].x = nextX;
-                                remainingX -= stepX;
+                                continue;
                             }
-                            else
+                            // プレイヤーの初期位置付近には置かない
+                            if (fabsf(spawnX - player.x) < 640.0f && fabsf(spawnY - player.y) < 400.0f)
                             {
-                                bombs[i].velocityX = 0.0f;
-                                break;
+                                continue;
                             }
-                        }
-
-                        // 縦方向の移動と床・天井判定
-                        float remainingY = bombs[i].velocityY;
-
-                        while (fabsf(remainingY) > 0.001f)
-                        {
-                            float stepY = remainingY;
-
-                            if (stepY > 4.0f) stepY = 4.0f;
-                            if (stepY < -4.0f) stepY = -4.0f;
-
-                            float nextY = bombs[i].y + stepY;
-
-                            if (nextY >= 10.0f &&
-                                !(scene == SCENE_TUTORIAL
-                                    ? CheckTutorialMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)
-                                    : scene == SCENE_GAME2
-                                    ? CheckBossMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)
-                                    : CheckMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)))
+                            // 敵同士が初期状態で重ならないようにする
+                            bool overlaps = false;
+                            for (int j = 0; j < spawnedEnemies; ++j)
                             {
-                                bombs[i].y = nextY;
-                                remainingY -= stepY;
-                            }
-                            else
-                            {
-                                bombs[i].velocityY = 0.0f;
-                                break;
-                            }
-                        }
-
-                        bombs[i].timer--;
-
-                        // 爆発15フレーム前に1回だけ再生
-                        if (bombs[i].timer == 15)
-                        {
-                            Novice::PlayAudio(Explosion01, false, 0.5f);
-                        }
-
-                        if (bombs[i].timer <= 0)
-                        {
-                            bombs[i].isExplosion = true;
-                            bombs[i].explosionTimer = explosionDuration;
-
-                            // プレイヤーとの距離
-                            float dx = player.x - bombs[i].x;
-                            float dy = player.y - bombs[i].y;
-
-                            float distance = sqrtf(dx * dx + dy * dy);
-
-                            // 爆発範囲内ならノックバック
-                            if (distance < explosionRadius)
-                            {
-                                if (distance > 0.0f)
+                                if (fabsf(enemies[j].x - spawnX) < enemySize + 4.0f &&
+                                    fabsf(enemies[j].y - spawnY) < enemySize + 4.0f)
                                 {
-                                    velocityX += dx / distance * bombKnockBack;
-                                }
-                                // 上方向に吹き飛ばす
-                                velocityY = -25.0f;
-                            }
-
-                            //====================
-                           // 爆風で別の爆弾を吹き飛ばす
-                           //====================
-                            for (int j = 0; j < kBombCount; j++)
-                            {
-                                // 自分自身や爆発中の爆弾は除外
-                                if (i == j || !bombs[j].isActive ||
-                                    bombs[j].isExplosion)
-                                {
-                                    continue;
-                                }
-
-                                float dx1 = bombs[j].x - bombs[i].x;
-                                float dy1 = bombs[j].y - bombs[i].y;
-
-                                float distance1 = sqrtf(dx1 * dx1 + dy1 * dy1);
-
-                                if (distance1 < explosionRadius)
-                                {
-                                    float directionX = 1.0f;
-
-                                    if (distance1 > 0.001f)
-                                    {
-                                        directionX = dx1 / distance1;
-                                    }
-
-                                    // 横方向に吹き飛ばす
-                                    bombs[j].velocityX = directionX * 20.0f;
-
-                                    // 上方向にも吹き飛ばす
-                                    bombs[j].velocityY = -15.0f;
+                                    overlaps = true;
+                                    break;
                                 }
                             }
+                            if (overlaps) continue;
 
-                            // 爆発範囲内の敵をそれぞれ吹き飛ばす
-                            for (int e = 0; scene == SCENE_GAME && e < spawnedEnemies; ++e)
-                            {
-                                if (enemies[e].isAlive)
-                                {
-                                    float enemyDx = enemies[e].x - bombs[i].x;
-                                    float enemyDy = enemies[e].y - bombs[i].y;
-                                    float enemyDistance = sqrtf(enemyDx * enemyDx + enemyDy * enemyDy);
-                                    if (enemyDistance < explosionRadius)
-                                    {
-                                        // 重なっていても方向が決まるようにする
-                                        float directionX = enemyDx >= 0.0f ? 1.0f : -1.0f;
-                                        if (enemyDistance > 0.001f)
-                                        {
-                                            directionX = enemyDx / enemyDistance;
-                                        }
-                                        // 壁にぶつけやすいように横方向の最低速度を確保
-                                        if (directionX > -0.5f && directionX < 0.5f)
-                                        {
-                                            directionX = directionX >= 0.0f ? 0.5f : -0.5f;
-                                        }
-                                        enemies[e].velocityX = directionX * 24.0f;
-                                        enemies[e].velocityY = -12.0f;
-                                        enemies[e].isKnockedBack = true;
-                                        enemies[e].knockbackTimer = 45;
-                                        enemies[e].isDead = true;
-                                        enemies[e].deathTimer = 180;
-                                        enemies[e].rotationSpeed = directionX * 0.16f;
-                                    }
-                                }
-                            }
-
-                            //shake起動条件
-                            if (bombs[i].timer == 0) {
-                                shake.backGroundFlag = true;
-                            }
-
+                            Enemy& e = enemies[spawnedEnemies++];
+                            e.x = spawnX;
+                            e.y = spawnY;
+                            e.speed = 2.0f;
+                            e.isAlive = true;
+                            e.isKnockedBack = false;
+                            e.knockbackTimer = 0;
+                            break;
                         }
+                    }
+
+                    // Dキーで右移動
+                    if (keys[DIK_D]) {
+                        velocityX += accelerationX;
+                    }
+
+                    // Aキーで左移動
+                    if (keys[DIK_A]) {
+                        velocityX -= accelerationX;
+                    }
+
+                    //====================
+                    // 重力処理
+                    //====================
+
+                    // 毎フレーム下方向に加速
+                    velocityY += gravity;
+
+                    // 最大落下速度を制限
+                    if (velocityY > maxFallSpeed) {
+                        velocityY = maxFallSpeed;
+                    }
+
+                    //====================
+                    // 摩擦
+                    //====================
+                    // 地上・空中とも同じ摩擦を使い、キーを離したらすぐ減速する
+                    velocityX *= frictionX;
+
+                    //====================
+                    // 座標更新
+                    //====================
+                  // 横方向の移動
+                    float nextX = player.x + velocityX;
+
+                    if (!(scene == SCENE_TUTORIAL
+                        ? CheckTutorialMapCollision(nextX, player.y, playerWidth, playerHeight)
+                        : scene == SCENE_GAME2
+                        ? CheckBossMapCollision(nextX, player.y, playerWidth, playerHeight)
+                        : CheckMapCollision(nextX, player.y, playerWidth, playerHeight)))
+                    {
+                        player.x = nextX;
                     }
                     else
                     {
-                        bombs[i].explosionTimer--;
+                        velocityX = 0.0f;
+                    }
 
-                        if (bombs[i].explosionTimer <= 0)
+                    // 縦方向の移動
+                    float nextY = player.y + velocityY;
+
+                    if (!(scene == SCENE_TUTORIAL
+                        ? CheckTutorialMapCollision(player.x, nextY, playerWidth, playerHeight)
+                        : scene == SCENE_GAME2
+                        ? CheckBossMapCollision(player.x, nextY, playerWidth, playerHeight)
+                        : CheckMapCollision(player.x, nextY, playerWidth, playerHeight)))
+                    {
+                        player.y = nextY;
+                        isGround = false;
+                    }
+                    else
+                    {
+                        if (velocityY > 0.0f)
                         {
-                            bombs[i].isActive = false;
-                            bombs[i].isExplosion = false;
+                            isGround = true;
+                        }
 
-                            //--- 壊せる壁の破壊処理 ---
-                            //爆発中心のタイル座標
-                            int explosionTileX = (int)bombs[i].x / kTileSize;
-                            int explosionTileY = (int)bombs[i].y / kTileSize;
+                        velocityY = 0.0f;
+                    }
+                    // アイテム取得（通常ステージのみ）。アイテムのタイル値は4。
+                    if (scene == SCENE_GAME) {
+                        int leftTile = (int)floorf((player.x - playerWidth / 2.0f) / kTileSize);
+                        int rightTile = (int)floorf((player.x + playerWidth / 2.0f - 0.001f) / kTileSize);
+                        int topTile = (int)floorf((player.y - playerHeight / 2.0f) / kTileSize);
+                        int bottomTile = (int)floorf((player.y + playerHeight / 2.0f - 0.001f) / kTileSize);
+                        for (int ty = topTile; ty <= bottomTile; ++ty) {
+                            for (int tx = leftTile; tx <= rightTile; ++tx) {
+                                if (tx >= 0 && tx < kMapWidth && ty >= 0 && ty < kMapHeight &&
+                                    map[ty][tx] == 4) {
+                                    // 最後のアイテムを拾った場所を扉の出現位置にする
+                                    if (collectedItems == kRequiredItems - 1) {
+                                        doorX = (float)(tx * kTileSize);
+                                        doorY = (float)(ty * kTileSize) - 32.0f;
+                                    }
+                                    map[ty][tx] = 0;
+                                    if (collectedItems < kRequiredItems) collectedItems++;
+                                }
+                            }
+                        }
 
-                            //爆風が届くタイルの半径（切り上げ）
-                            int explosionTileRadius = (int)ceilf(explosionRadius / kTileSize);
+                        // 1つ目のコード：扉に触れた状態でスペースを押してボス戦へ
+                        isTouchingDoor = collectedItems >= kRequiredItems &&
+                            fabsf(player.x - (doorX + 16.0f)) < playerWidth / 2.0f + 16.0f &&
+                            fabsf(player.y - (doorY + 32.0f)) < playerHeight / 2.0f + 32.0f;
+                        if (isTouchingDoor && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
+                            // BGMは再生ハンドルで停止する（音源IDでは停止できない）
+                            if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
+                            if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
+                            if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
+                            bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
 
+                            scene = SCENE_GAME2;
 
-                            //探索するタイルの範囲（最小・最大座標）
-                            int minExTileX = explosionTileX - explosionTileRadius;
-                            int maxExTileX = explosionTileX + explosionTileRadius;
-                            int minExTileY = explosionTileY - explosionTileRadius;
-                            int maxExTileY = explosionTileY + explosionTileRadius;
+                            player.x = 200.0f;
+                            player.y = 500.0f;
+                            velocityX = 0.0f;
+                            velocityY = 0.0f;
+                            cameraX = 0.0f;
+                            cameraY = 0.0f;
+                            for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
+                            boss.x = 900.0f;
+                            boss.y = 580.0f;
+                            boss.maxHp = 10;
+                            boss.hp = boss.maxHp;
+                            boss.isAlive = true;
+                            boss.damageCooldown = 0;
+                            bossPhase = 1;
+                            armorHp = kArmorMaxHp;
+                            armorOpenTimer = 0;
+                            phaseChangeTimer = 0;
+                            transformTimer = 0;
+                            bossDeathTimer = 0;
+                            betrayalTimer = -1;
+                            bossWallTimer = 0;
+                            bossWallX = -1;
+                            bossWallRiseCount = 0;
+                            playerWallHitCooldown = 0;
+                            InitBossMap();
+                            rockAttackTimer = 0;
+                            rockPhase = 0;
+                            rockPhaseTimer = 0;
+                            rockLeftX = -rockWidth;
+                            rockRightX = 1280.0f;
+                            rockTargetX = player.x;
+                            rockLeftAlive = false;
+                            rockRightAlive = false;
+                            rockHitCooldown = 0;
+                            fallingRockAttackTimer = 0;
+                            fallingRockHitCooldown = 0;
+                            chargePhase = 0;
+                            chargeTimer = 0;
+                            chargeAttackTimer = 0;
+                            chargeHitCooldown = 0;
+                            for (int i = 0; i < kFallingRockCount; ++i) fallingRocks[i] = FallingRock{};
+                        }
+                    }
 
-                            for (int checkY = minExTileY; checkY <= maxExTileY; checkY++)
+                    // 着地済みの岩は障害物：重なった場合は横へ押し出す
+                    if (scene == SCENE_GAME2) {
+                        for (int i = 0; i < kFallingRockCount; ++i) {
+                            const FallingRock& r = fallingRocks[i];
+                            if (!r.active || !r.landed) continue;
+                            float dx = player.x - r.x;
+                            float dy = player.y - r.y;
+                            float overlapX = playerWidth * 0.5f + 32.0f - fabsf(dx);
+                            float overlapY = playerHeight * 0.5f + 32.0f - fabsf(dy);
+                            if (overlapX > 0.0f && overlapY > 0.0f) {
+                                if (overlapX < overlapY) {
+                                    player.x += dx < 0.0f ? -overlapX : overlapX;
+                                    velocityX = 0.0f;
+                                }
+                                else {
+                                    player.y += dy < 0.0f ? -overlapY : overlapY;
+                                    velocityY = 0.0f;
+                                    if (dy < 0.0f) isGround = true;
+                                }
+                            }
+                        }
+                    }
+
+                    //====================
+                   // 爆弾の設置
+                   //====================
+                    if (keys[DIK_SPACE] && !preKeys[DIK_SPACE])
+                    {
+                        for (int i = 0; i < kBombCount; i++)
+                        {
+                            if (!bombs[i].isActive)
                             {
-                                for (int checkX = minExTileX; checkX <= maxExTileX; checkX++)
+                                bombs[i].x = player.x;
+                                bombs[i].y = player.y + 10;
+
+                                bombs[i].velocityX = 0.0f;
+                                bombs[i].velocityY = 0.0f;
+
+                                bombs[i].timer = bombFuseTime;
+                                bombs[i].isActive = true;
+                                bombs[i].isExplosion = false;
+                                bombs[i].explosionTimer = 0;
+
+                                break;
+                            }
+                        }
+                    }
+                }
+                //====================
+                // 爆弾の更新
+                //====================
+                for (int i = 0; i < kBombCount; i++)
+                {
+                    if (bombs[i].isActive)
+                    {
+                        if (!bombs[i].isExplosion)
+                        {
+
+                            //====================
+                            // 爆弾の物理処理
+                            //====================
+
+                            // 重力
+                            bombs[i].velocityY += 0.6f;
+
+                            // 最大落下速度
+                            if (bombs[i].velocityY > 15.0f)
+                            {
+                                bombs[i].velocityY = 15.0f;
+                            }
+
+                            // 横方向の摩擦
+                            bombs[i].velocityX *= 0.98f;
+
+                            // 横方向の移動と壁判定
+                            float remainingX = bombs[i].velocityX;
+
+                            while (fabsf(remainingX) > 0.001f)
+                            {
+                                float stepX = remainingX;
+
+                                if (stepX > 4.0f) stepX = 4.0f;
+                                if (stepX < -4.0f) stepX = -4.0f;
+
+                                float nextX = bombs[i].x + stepX;
+
+                                if (nextX >= 10.0f &&
+                                    nextX <= kMapWidth * kTileSize - 10.0f &&
+                                    !(scene == SCENE_TUTORIAL
+                                        ? CheckTutorialMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)
+                                        : scene == SCENE_GAME2
+                                        ? CheckBossMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)
+                                        : CheckMapCollision(nextX, bombs[i].y, 20.0f, 20.0f)))
                                 {
-                                    // マップ配列の範囲内か確認
-                                    int activeMapWidth = scene == SCENE_TUTORIAL ? kTutorialMapWidth : (scene == SCENE_GAME2 ? kBossMapWidth : kMapWidth);
-                                    int activeMapHeight = scene == SCENE_TUTORIAL ? kTutorialMapHeight : kMapHeight;
-                                    if (checkX < 0 || checkX >= activeMapWidth ||
-                                        checkY < 0 || checkY >= activeMapHeight)
+                                    bombs[i].x = nextX;
+                                    remainingX -= stepX;
+                                }
+                                else
+                                {
+                                    bombs[i].velocityX = 0.0f;
+                                    break;
+                                }
+                            }
+
+                            // 縦方向の移動と床・天井判定
+                            float remainingY = bombs[i].velocityY;
+
+                            while (fabsf(remainingY) > 0.001f)
+                            {
+                                float stepY = remainingY;
+
+                                if (stepY > 4.0f) stepY = 4.0f;
+                                if (stepY < -4.0f) stepY = -4.0f;
+
+                                float nextY = bombs[i].y + stepY;
+
+                                if (nextY >= 10.0f &&
+                                    !(scene == SCENE_TUTORIAL
+                                        ? CheckTutorialMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)
+                                        : scene == SCENE_GAME2
+                                        ? CheckBossMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)
+                                        : CheckMapCollision(bombs[i].x, nextY, 20.0f, 20.0f)))
+                                {
+                                    bombs[i].y = nextY;
+                                    remainingY -= stepY;
+                                }
+                                else
+                                {
+                                    bombs[i].velocityY = 0.0f;
+                                    break;
+                                }
+                            }
+
+                            bombs[i].timer--;
+
+                            // 爆発15フレーム前に1回だけ再生
+                            if (bombs[i].timer == 15)
+                            {
+                                Novice::PlayAudio(Explosion01, false, 0.5f);
+                            }
+
+                            if (bombs[i].timer <= 0)
+                            {
+                                bombs[i].isExplosion = true;
+                                bombs[i].explosionTimer = explosionDuration;
+
+                                // プレイヤーとの距離
+                                float dx = player.x - bombs[i].x;
+                                float dy = player.y - bombs[i].y;
+
+                                float distance = sqrtf(dx * dx + dy * dy);
+
+                                // 爆発範囲内ならノックバック
+                                if (distance < explosionRadius)
+                                {
+                                    if (distance > 0.0f)
+                                    {
+                                        velocityX += dx / distance * bombKnockBack;
+                                    }
+                                    // 上方向に吹き飛ばす
+                                    velocityY = -25.0f;
+                                }
+
+                                //====================
+                               // 爆風で別の爆弾を吹き飛ばす
+                               //====================
+                                for (int j = 0; j < kBombCount; j++)
+                                {
+                                    // 自分自身や爆発中の爆弾は除外
+                                    if (i == j || !bombs[j].isActive ||
+                                        bombs[j].isExplosion)
                                     {
                                         continue;
                                     }
 
-                                    // 壊せる壁の場合
-                                    if ((scene == SCENE_TUTORIAL ? tutorialMap[checkY][checkX] :
-                                        (scene == SCENE_GAME2 ? bossMap[checkY][checkX] : map[checkY][checkX])) == 3)
+                                    float dx1 = bombs[j].x - bombs[i].x;
+                                    float dy1 = bombs[j].y - bombs[i].y;
+
+                                    float distance1 = sqrtf(dx1 * dx1 + dy1 * dy1);
+
+                                    if (distance1 < explosionRadius)
                                     {
-                                        float tileCenterX = (checkX + 0.5f) * kTileSize;
-                                        float tileCenterY = (checkY + 0.5f) * kTileSize;
+                                        float directionX = 1.0f;
 
-                                        float diffX = tileCenterX - bombs[i].x;
-                                        float diffY = tileCenterY - bombs[i].y;
-                                        float distanceToBomb = sqrtf(diffX * diffX + diffY * diffY);
-
-                                        // 爆発範囲内なら破壊
-                                        if (distanceToBomb <= explosionRadius)
+                                        if (distance1 > 0.001f)
                                         {
-                                            float particleX = (float)(checkX * kTileSize);
-                                            float particleY = (float)(checkY * kTileSize);
+                                            directionX = dx1 / distance1;
+                                        }
 
-                                            SpawnBreakParticles(particleX, particleY);
+                                        // 横方向に吹き飛ばす
+                                        bombs[j].velocityX = directionX * 20.0f;
 
-                                            // ブロック破壊SE
-                                            Novice::PlayAudio(hakaiSE, false, 0.1f);
+                                        // 上方向にも吹き飛ばす
+                                        bombs[j].velocityY = -15.0f;
+                                    }
+                                }
 
-                                            // 壁を消す
-                                            if (scene == SCENE_TUTORIAL) {
-                                                tutorialMap[checkY][checkX] = 0;
+                                // 爆発範囲内の敵をそれぞれ吹き飛ばす
+                                for (int e = 0; scene == SCENE_GAME && e < spawnedEnemies; ++e)
+                                {
+                                    if (enemies[e].isAlive)
+                                    {
+                                        float enemyDx = enemies[e].x - bombs[i].x;
+                                        float enemyDy = enemies[e].y - bombs[i].y;
+                                        float enemyDistance = sqrtf(enemyDx * enemyDx + enemyDy * enemyDy);
+                                        if (enemyDistance < explosionRadius)
+                                        {
+                                            // 重なっていても方向が決まるようにする
+                                            float directionX = enemyDx >= 0.0f ? 1.0f : -1.0f;
+                                            if (enemyDistance > 0.001f)
+                                            {
+                                                directionX = enemyDx / enemyDistance;
                                             }
-                                            else if (scene == SCENE_GAME2) {
-                                                bossMap[checkY][checkX] = 0;
+                                            // 壁にぶつけやすいように横方向の最低速度を確保
+                                            if (directionX > -0.5f && directionX < 0.5f)
+                                            {
+                                                directionX = directionX >= 0.0f ? 0.5f : -0.5f;
                                             }
-                                            else {
-                                                map[checkY][checkX] = 0;
+                                            enemies[e].velocityX = directionX * 24.0f;
+                                            enemies[e].velocityY = -12.0f;
+                                            enemies[e].isKnockedBack = true;
+                                            enemies[e].knockbackTimer = 45;
+                                            enemies[e].isDead = true;
+                                            enemies[e].deathTimer = 180;
+                                            enemies[e].rotationSpeed = directionX * 0.16f;
+                                        }
+                                    }
+                                }
+
+                                //shake起動条件
+                                if (bombs[i].timer == 0) {
+                                    shake.backGroundFlag = true;
+                                }
+
+                            }
+                        }
+                        else
+                        {
+                            bombs[i].explosionTimer--;
+
+                            if (bombs[i].explosionTimer <= 0)
+                            {
+                                bombs[i].isActive = false;
+                                bombs[i].isExplosion = false;
+
+                                //--- 壊せる壁の破壊処理 ---
+                                //爆発中心のタイル座標
+                                int explosionTileX = (int)bombs[i].x / kTileSize;
+                                int explosionTileY = (int)bombs[i].y / kTileSize;
+
+                                //爆風が届くタイルの半径（切り上げ）
+                                int explosionTileRadius = (int)ceilf(explosionRadius / kTileSize);
+
+
+                                //探索するタイルの範囲（最小・最大座標）
+                                int minExTileX = explosionTileX - explosionTileRadius;
+                                int maxExTileX = explosionTileX + explosionTileRadius;
+                                int minExTileY = explosionTileY - explosionTileRadius;
+                                int maxExTileY = explosionTileY + explosionTileRadius;
+
+                                for (int checkY = minExTileY; checkY <= maxExTileY; checkY++)
+                                {
+                                    for (int checkX = minExTileX; checkX <= maxExTileX; checkX++)
+                                    {
+                                        // マップ配列の範囲内か確認
+                                        int activeMapWidth = scene == SCENE_TUTORIAL ? kTutorialMapWidth : (scene == SCENE_GAME2 ? kBossMapWidth : kMapWidth);
+                                        int activeMapHeight = scene == SCENE_TUTORIAL ? kTutorialMapHeight : kMapHeight;
+                                        if (checkX < 0 || checkX >= activeMapWidth ||
+                                            checkY < 0 || checkY >= activeMapHeight)
+                                        {
+                                            continue;
+                                        }
+
+                                        // 壊せる壁の場合
+                                        if ((scene == SCENE_TUTORIAL ? tutorialMap[checkY][checkX] :
+                                            (scene == SCENE_GAME2 ? bossMap[checkY][checkX] : map[checkY][checkX])) == 3)
+                                        {
+                                            float tileCenterX = (checkX + 0.5f) * kTileSize;
+                                            float tileCenterY = (checkY + 0.5f) * kTileSize;
+
+                                            float diffX = tileCenterX - bombs[i].x;
+                                            float diffY = tileCenterY - bombs[i].y;
+                                            float distanceToBomb = sqrtf(diffX * diffX + diffY * diffY);
+
+                                            // 爆発範囲内なら破壊
+                                            if (distanceToBomb <= explosionRadius)
+                                            {
+                                                float particleX = (float)(checkX * kTileSize);
+                                                float particleY = (float)(checkY * kTileSize);
+
+                                                SpawnBreakParticles(particleX, particleY);
+
+                                                // ブロック破壊SE
+                                                Novice::PlayAudio(hakaiSE, false, 0.1f);
+
+                                                // 壁を消す
+                                                if (scene == SCENE_TUTORIAL) {
+                                                    tutorialMap[checkY][checkX] = 0;
+                                                }
+                                                else if (scene == SCENE_GAME2) {
+                                                    bossMap[checkY][checkX] = 0;
+                                                }
+                                                else {
+                                                    map[checkY][checkX] = 0;
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                        }
-                    }
-                }
-            }
-
-
-
-            // ===== 固定砲台：プレイヤーを狙って射撃 =====
-            if (scene == SCENE_GAME && !mapEditorMode) {
-                if (turretHitCooldown > 0) --turretHitCooldown;
-                for (int t = 0; t < kTurretCount; ++t) {
-                    FixedTurret& turret = turrets[t];
-                    if (!turret.active) continue;
-                    // 爆風を受けると耐久力が減る（同じ爆発では一度だけ）
-                    for (int b = 0; b < kBombCount; ++b) {
-                        if (!bombs[b].isActive || !bombs[b].isExplosion ||
-                            bombs[b].explosionTimer != explosionDuration - 1) continue;
-                        float bx = turret.x - bombs[b].x;
-                        float by = turret.y - bombs[b].y;
-                        if (bx * bx + by * by < explosionRadius * explosionRadius) {
-                            --turret.hp;
-                            if (turret.hp <= 0) {
-                                turret.active = false;
-                                SpawnBreakParticles(turret.x, turret.y);
                             }
                         }
                     }
-                    if (!turret.active) continue;
-                    float dx = player.x - turret.x;
-                    float dy = player.y - turret.y;
-                    float distance = sqrtf(dx * dx + dy * dy);
-                    if (distance > 1.0f) {
-                        turret.aimX = dx / distance;
-                        turret.aimY = dy / distance;
-                    }
-                    if (turret.cooldown > 0) --turret.cooldown;
-                    if (distance < 650.0f && distance > 45.0f && turret.cooldown <= 0) {
-                        for (int j = 0; j < kTurretShotCount; ++j) {
-                            if (turretShots[j].active) continue;
-                            turretShots[j] = { turret.x + turret.aimX * 24.0f,
-                                turret.y + turret.aimY * 24.0f,
-                                turret.aimX * 7.0f, turret.aimY * 7.0f, true };
-                            break;
+                }
+
+
+
+                // ===== 固定砲台：プレイヤーを狙って射撃 =====
+                if (scene == SCENE_GAME && !mapEditorMode) {
+                    if (turretHitCooldown > 0) --turretHitCooldown;
+                    for (int t = 0; t < kTurretCount; ++t) {
+                        FixedTurret& turret = turrets[t];
+                        if (!turret.active) continue;
+                        // 爆風を受けると耐久力が減る（同じ爆発では一度だけ）
+                        for (int b = 0; b < kBombCount; ++b) {
+                            if (!bombs[b].isActive || !bombs[b].isExplosion ||
+                                bombs[b].explosionTimer != explosionDuration - 1) continue;
+                            float bx = turret.x - bombs[b].x;
+                            float by = turret.y - bombs[b].y;
+                            if (bx * bx + by * by < explosionRadius * explosionRadius) {
+                                --turret.hp;
+                                if (turret.hp <= 0) {
+                                    turret.active = false;
+                                    SpawnBreakParticles(turret.x, turret.y);
+                                }
+                            }
                         }
-                        turret.cooldown = 105; // 1.75秒ごとに発射
+                        if (!turret.active) continue;
+                        float dx = player.x - turret.x;
+                        float dy = player.y - turret.y;
+                        float distance = sqrtf(dx * dx + dy * dy);
+                        if (distance > 1.0f) {
+                            turret.aimX = dx / distance;
+                            turret.aimY = dy / distance;
+                        }
+                        if (turret.cooldown > 0) --turret.cooldown;
+                        if (distance < 650.0f && distance > 45.0f && turret.cooldown <= 0) {
+                            for (int j = 0; j < kTurretShotCount; ++j) {
+                                if (turretShots[j].active) continue;
+                                turretShots[j] = { turret.x + turret.aimX * 24.0f,
+                                    turret.y + turret.aimY * 24.0f,
+                                    turret.aimX * 7.0f, turret.aimY * 7.0f, true };
+                                break;
+                            }
+                            turret.cooldown = 105; // 1.75秒ごとに発射
+                        }
+                    }
+                    for (int j = 0; j < kTurretShotCount; ++j) {
+                        TurretShot& shot = turretShots[j];
+                        if (!shot.active) continue;
+                        shot.x += shot.vx;
+                        shot.y += shot.vy;
+                        if (shot.x < 0 || shot.x >= kMapWidth * kTileSize ||
+                            shot.y < 0 || shot.y >= kMapHeight * kTileSize ||
+                            CheckMapCollision(shot.x, shot.y, 10.0f, 10.0f)) {
+                            shot.active = false;
+                            continue;
+                        }
+                        if (fabsf(shot.x - player.x) < playerWidth * 0.5f + 5.0f &&
+                            fabsf(shot.y - player.y) < playerHeight * 0.5f + 5.0f) {
+                            shot.active = false;
+                            if (turretHitCooldown == 0) {
+                                TakePlayerDamage();
+
+                                velocityX = shot.vx > 0 ? 12.0f : -12.0f;
+                                velocityY = -9.0f;
+                                turretHitCooldown = 50;
+                            }
+                        }
                     }
                 }
-                for (int j = 0; j < kTurretShotCount; ++j) {
-                    TurretShot& shot = turretShots[j];
-                    if (!shot.active) continue;
-                    shot.x += shot.vx;
-                    shot.y += shot.vy;
-                    if (shot.x < 0 || shot.x >= kMapWidth * kTileSize ||
-                        shot.y < 0 || shot.y >= kMapHeight * kTileSize ||
-                        CheckMapCollision(shot.x, shot.y, 10.0f, 10.0f)) {
-                        shot.active = false;
-                        continue;
-                    }
-                    if (fabsf(shot.x - player.x) < playerWidth * 0.5f + 5.0f &&
-                        fabsf(shot.y - player.y) < playerHeight * 0.5f + 5.0f) {
-                        shot.active = false;
-                        if (turretHitCooldown == 0) {
-                            TakePlayerDamage();
 
-                            velocityX = shot.vx > 0 ? 12.0f : -12.0f;
-                            velocityY = -9.0f;
-                            turretHitCooldown = 50;
-                        }
-                    }
-                }
-            }
-
-            //====================
-            // 追跡型の敵：爆風で飛び、壁に強く衝突すると倒れる
-            //====================
-            for (int e = 0; e < spawnedEnemies; ++e)
-                if (scene == SCENE_GAME && enemies[e].isAlive)
-                {
-                    if (enemies[e].isKnockedBack)
+                //====================
+                // 追跡型の敵：爆風で飛び、壁に強く衝突すると倒れる
+                //====================
+                for (int e = 0; e < spawnedEnemies; ++e)
+                    if (scene == SCENE_GAME && enemies[e].isAlive)
                     {
-                        enemies[e].knockbackTimer--;
-                        // 吹き飛び中は横方向の速度を緩やかに減衰
-                        enemies[e].velocityX *= 0.99f;
-                    }
-                    else
-                    {
-                        float dx = player.x - enemies[e].x;
-                        if (dx > 30.0f) {
-                            enemies[e].velocityX += enemies[e].speed * 0.1f;
-                        }
-                        else if (dx < -30.0f) {
-                            enemies[e].velocityX -= enemies[e].speed * 0.1f;
-                        }
-                        enemies[e].velocityX *= 0.9f;
-                    }
-
-                    enemies[e].velocityY += gravity;
-                    if (enemies[e].velocityY > maxFallSpeed) {
-                        enemies[e].velocityY = maxFallSpeed;
-                    }
-
-                    // 高速でも壁をすり抜けないように小刻みに移動
-                    float remainingX = enemies[e].velocityX;
-                    while (enemies[e].isAlive && fabsf(remainingX) > 0.001f)
-                    {
-                        float stepX = remainingX;
-                        if (stepX > 4.0f) stepX = 4.0f;
-                        if (stepX < -4.0f) stepX = -4.0f;
-                        if (enemies[e].x + stepX >= 20.0f &&
-                            enemies[e].x + stepX <= kMapWidth * kTileSize - 20.0f &&
-                            !CheckMapCollision(enemies[e].x + stepX, enemies[e].y, 40.0f, 40.0f))
+                        if (enemies[e].isKnockedBack)
                         {
-                            enemies[e].x += stepX;
-                            remainingX -= stepX;
+                            enemies[e].knockbackTimer--;
+                            // 吹き飛び中は横方向の速度を緩やかに減衰
+                            enemies[e].velocityX *= 0.99f;
                         }
                         else
                         {
-                            // 衝突直前の速度でダメージを判定
-                            if (enemies[e].isKnockedBack && fabsf(enemies[e].velocityX) >= 8.0f)
-                            {
-                                enemies[e].isAlive = false;
+                            float dx = player.x - enemies[e].x;
+                            if (dx > 30.0f) {
+                                enemies[e].velocityX += enemies[e].speed * 0.1f;
                             }
-                            enemies[e].velocityX = 0.0f;
-                            break;
+                            else if (dx < -30.0f) {
+                                enemies[e].velocityX -= enemies[e].speed * 0.1f;
+                            }
+                            enemies[e].velocityX *= 0.9f;
                         }
-                    }
 
-                    if (enemies[e].isAlive)
-                    {
-                        float remainingY = enemies[e].velocityY;
-                        bool hitVertical = false;
-                        while (fabsf(remainingY) > 0.001f)
+                        enemies[e].velocityY += gravity;
+                        if (enemies[e].velocityY > maxFallSpeed) {
+                            enemies[e].velocityY = maxFallSpeed;
+                        }
+
+                        // 高速でも壁をすり抜けないように小刻みに移動
+                        float remainingX = enemies[e].velocityX;
+                        while (enemies[e].isAlive && fabsf(remainingX) > 0.001f)
                         {
-                            float stepY = remainingY;
-                            if (stepY > 4.0f) stepY = 4.0f;
-                            if (stepY < -4.0f) stepY = -4.0f;
-                            if (!CheckMapCollision(enemies[e].x, enemies[e].y + stepY, 40.0f, 40.0f))
+                            float stepX = remainingX;
+                            if (stepX > 4.0f) stepX = 4.0f;
+                            if (stepX < -4.0f) stepX = -4.0f;
+                            if (enemies[e].x + stepX >= 20.0f &&
+                                enemies[e].x + stepX <= kMapWidth * kTileSize - 20.0f &&
+                                !CheckMapCollision(enemies[e].x + stepX, enemies[e].y, 40.0f, 40.0f))
                             {
-                                enemies[e].y += stepY;
-                                remainingY -= stepY;
+                                enemies[e].x += stepX;
+                                remainingX -= stepX;
                             }
                             else
                             {
-                                hitVertical = true;
-                                enemies[e].velocityY = 0.0f;
+                                // 衝突直前の速度でダメージを判定
+                                if (enemies[e].isKnockedBack && fabsf(enemies[e].velocityX) >= 8.0f)
+                                {
+                                    enemies[e].isAlive = false;
+                                }
+                                enemies[e].velocityX = 0.0f;
                                 break;
                             }
                         }
 
-                        // 地面に着地したら追跡に戻る（空中で45F経過しても戻る）
-                        if (enemies[e].isKnockedBack &&
-                            ((hitVertical && remainingY > 0.0f) || enemies[e].knockbackTimer <= 0))
+                        if (enemies[e].isAlive)
                         {
-                            enemies[e].isKnockedBack = false;
-                        }
+                            float remainingY = enemies[e].velocityY;
+                            bool hitVertical = false;
+                            while (fabsf(remainingY) > 0.001f)
+                            {
+                                float stepY = remainingY;
+                                if (stepY > 4.0f) stepY = 4.0f;
+                                if (stepY < -4.0f) stepY = -4.0f;
+                                if (!CheckMapCollision(enemies[e].x, enemies[e].y + stepY, 40.0f, 40.0f))
+                                {
+                                    enemies[e].y += stepY;
+                                    remainingY -= stepY;
+                                }
+                                else
+                                {
+                                    hitVertical = true;
+                                    enemies[e].velocityY = 0.0f;
+                                    break;
+                                }
+                            }
 
-                        // 雑魚敵とプレイヤーの接触判定
-                        if (scene == SCENE_GAME &&
-                            enemies[e].isAlive &&
-                            !enemies[e].isExploding) {
+                            // 地面に着地したら追跡に戻る（空中で45F経過しても戻る）
+                            if (enemies[e].isKnockedBack &&
+                                ((hitVertical && remainingY > 0.0f) || enemies[e].knockbackTimer <= 0))
+                            {
+                                enemies[e].isKnockedBack = false;
+                            }
 
-                            float dx = fabsf(player.x - enemies[e].x);
-                            float dy = fabsf(player.y - enemies[e].y);
+                            // 雑魚敵とプレイヤーの接触判定
+                            if (scene == SCENE_GAME &&
+                                enemies[e].isAlive &&
+                                !enemies[e].isExploding) {
 
-                            if (dx < (playerWidth + 40.0f) / 2.0f &&
-                                dy < (playerHeight + 40.0f) / 2.0f) {
+                                float dx = fabsf(player.x - enemies[e].x);
+                                float dy = fabsf(player.y - enemies[e].y);
 
-                                TakePlayerDamage();
+                                if (dx < (playerWidth + 40.0f) / 2.0f &&
+                                    dy < (playerHeight + 40.0f) / 2.0f) {
+
+                                    TakePlayerDamage();
+                                }
                             }
                         }
+
+                        //雑魚描画、上の処理を一行にまとめたもの
+                        currentEnemyFrame = ++currentEnemyFrame % kEnemyFPS;
+                        //現在のフレームがフレーム以上になったら
+                        if (currentEnemyFrame % (kEnemyFPS / kMaxEnemyAnimationFrame) == 0) {
+                            //アニメーションフレームを加算
+                            currentEnemyAnimationFrame++;
+                        }
+                        //9以上になったら
+                        if (currentEnemyAnimationFrame >= kMaxEnemyAnimationFrame) {
+                            //0に戻す
+                            currentEnemyAnimationFrame = 0;
+                        }
+                        //=====================↑↑↑
                     }
 
-                    //雑魚描画、上の処理を一行にまとめたもの
-                    currentEnemyFrame = ++currentEnemyFrame % kEnemyFPS;
-                    //現在のフレームがフレーム以上になったら
-                    if (currentEnemyFrame % (kEnemyFPS / kMaxEnemyAnimationFrame) == 0) {
-                        //アニメーションフレームを加算
-                        currentEnemyAnimationFrame++;
-                    }
-                    //9以上になったら
-                    if (currentEnemyAnimationFrame >= kMaxEnemyAnimationFrame) {
-                        //0に戻す
-                        currentEnemyAnimationFrame = 0;
-                    }
-                    //=====================↑↑↑
-                }
+                //====================
+                // 時間差の敵誘爆
+                //====================
+                const float chainRadius = 120.0f;
+                const int chainDelay = 5;
+                const int chainExplosionDuration = 15;
 
-            //====================
-            // 時間差の敵誘爆
-            //====================
-            const float chainRadius = 120.0f;
-            const int chainDelay = 5;
-            const int chainExplosionDuration = 15;
+                // ① 吹き飛ばされた敵が別の敵に衝突
+                for (int i = 0; i < spawnedEnemies; i++) {
 
-            // ① 吹き飛ばされた敵が別の敵に衝突
-            for (int i = 0; i < spawnedEnemies; i++) {
-
-                if (!enemies[i].isAlive ||
-                    !enemies[i].isDead ||
-                    enemies[i].isExploding ||
-                    enemies[i].explosionReserved) {
-                    continue;
-                }
-
-                for (int j = 0; j < spawnedEnemies; j++) {
-
-                    if (i == j ||
-                        !enemies[j].isAlive ||
-                        enemies[j].isExploding) {
+                    if (!enemies[i].isAlive ||
+                        !enemies[i].isDead ||
+                        enemies[i].isExploding ||
+                        enemies[i].explosionReserved) {
                         continue;
                     }
 
-                    float dx = enemies[j].x - enemies[i].x;
-                    float dy = enemies[j].y - enemies[i].y;
-
-                    float distance = sqrtf(dx * dx + dy * dy);
-
-                    if (distance < enemySize) {
-
-                        enemies[i].explosionReserved = true;
-                        enemies[i].chainTimer = chainDelay;
-                        break;
-                    }
-                }
-            }
-
-            // ② 誘爆予約のカウントダウン
-            for (int i = 0; i < spawnedEnemies; i++) {
-
-                if (!enemies[i].isAlive ||
-                    !enemies[i].explosionReserved) {
-                    continue;
-                }
-
-                enemies[i].chainTimer--;
-
-                if (enemies[i].chainTimer <= 0) {
-
-                    enemies[i].explosionReserved = false;
-                    enemies[i].isExploding = true;
-                    enemies[i].explosionTimer = chainExplosionDuration;
-                    Novice::PlayAudio(rensaSE, false, 1.0f);
-                    // 周囲の敵に次の誘爆を予約
                     for (int j = 0; j < spawnedEnemies; j++) {
 
                         if (i == j ||
                             !enemies[j].isAlive ||
-                            enemies[j].isExploding ||
-                            enemies[j].explosionReserved) {
+                            enemies[j].isExploding) {
                             continue;
                         }
 
@@ -1919,825 +1882,883 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                         float distance = sqrtf(dx * dx + dy * dy);
 
-                        if (distance < chainRadius) {
+                        if (distance < enemySize) {
 
-                            enemies[j].explosionReserved = true;
-                            enemies[j].chainTimer = chainDelay;
-                            enemies[j].isDead = true;
-
-                            float directionX =
-                                dx >= 0.0f ? 1.0f : -1.0f;
-
-                            enemies[j].velocityX = directionX * 20.0f;
-                            enemies[j].velocityY = -12.0f;
+                            enemies[i].explosionReserved = true;
+                            enemies[i].chainTimer = chainDelay;
+                            break;
                         }
                     }
                 }
-            }
 
-            // ③ 爆発エフェクトの時間管理
-            for (int i = 0; i < spawnedEnemies; i++) {
+                // ② 誘爆予約のカウントダウン
+                for (int i = 0; i < spawnedEnemies; i++) {
 
-                if (!enemies[i].isExploding) {
-                    continue;
-                }
-
-                enemies[i].explosionTimer--;
-
-                if (enemies[i].explosionTimer <= 0) {
-                    enemies[i].isAlive = false;
-                    enemies[i].isExploding = false;
-                }
-            }
-
-            //====================
-            // 落石攻撃（ボス戦）
-            //====================
-            if (scene == SCENE_GAME2) {
-
-                if (fallingRockHitCooldown > 0) --fallingRockHitCooldown;
-                if (!boss.isAlive) {
-                    for (int i = 0; i < kFallingRockCount; ++i) {
-                        fallingRocks[i].active = false;
-                    }
-                }
-                else {
-
-                    // スタン中は新しい落石を発生させず、攻撃タイマーも停止する。
-                    if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) ++fallingRockAttackTimer;
-                    // 約6秒ごとに最大4個追加。着地済みの岩は再利用しない
-                    if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) &&
-                        fallingRockAttackTimer >= (bossPhase == 2 ? 270 : 360) && chargePhase == 0) {
-                        fallingRockAttackTimer = 0;
-                        const int fallingSpawnCount = (bossPhase == 2) ? 8 : 4;
-                        for (int spawn = 0; spawn < fallingSpawnCount; ++spawn) {
-                            int slot = -1;
-                            for (int i = 0; i < kFallingRockCount; ++i) {
-                                if (!fallingRocks[i].active) { slot = i; break; }
-                            }
-                            if (slot < 0) break;
-                            FallingRock& r = fallingRocks[slot];
-                            r = FallingRock{};
-                            r.active = true;
-                            r.falling = false;
-                            r.landed = false;
-                            r.y = -64.0f;
-                            r.warningTimer = 55 + spawn * 12;
-                            // 第2フェーズはプレイヤー周辺の広い範囲へ落とす。
-                            float offset = spawn == 0 ? 0.0f :
-                                (float)(rand() % (bossPhase == 2 ? 881 : 401) - (bossPhase == 2 ? 440 : 200));
-                            r.x = player.x + offset;
-                            if (r.x < 80.0f) r.x = 80.0f;
-                            if (r.x > 1200.0f) r.x = 1200.0f;
-                        }
+                    if (!enemies[i].isAlive ||
+                        !enemies[i].explosionReserved) {
+                        continue;
                     }
 
-                    for (int i = 0; i < kFallingRockCount; ++i) {
-                        FallingRock& r = fallingRocks[i];
-                        if (!r.active) continue;
+                    enemies[i].chainTimer--;
 
-                        // 落下中・着地済みのどちらも爆弾で破壊できる。
-                        // 岩の矩形と爆風の円の最短距離で判定する。
-                        bool broken = false;
-                        for (int j = 0; j < kBombCount; ++j) {
-                            if (!bombs[j].isActive || !bombs[j].isExplosion) continue;
-                            float dx = fabsf(bombs[j].x - r.x) - 32.0f;
-                            float dy = fabsf(bombs[j].y - r.y) - 32.0f;
-                            if (dx < 0.0f) dx = 0.0f;
-                            if (dy < 0.0f) dy = 0.0f;
-                            if (dx * dx + dy * dy <= explosionRadius * explosionRadius) {
-                                broken = true;
-                                break;
-                            }
-                        }
-                        if (broken) {
-                            SpawnBreakParticles(r.x - 16.0f, r.y - 16.0f);
-                            r.active = false;
-                            r.landed = false;
-                            continue;
-                        }
-                        if (r.landed) continue;
+                    if (enemies[i].chainTimer <= 0) {
 
-                        if (!r.falling) {
-                            --r.warningTimer;
-                            if (r.warningTimer <= 0) r.falling = true;
-                            continue;
-                        }
+                        enemies[i].explosionReserved = false;
+                        enemies[i].isExploding = true;
+                        enemies[i].explosionTimer = chainExplosionDuration;
+                        Novice::PlayAudio(rensaSE, false, 1.0f);
+                        // 周囲の敵に次の誘爆を予約
+                        for (int j = 0; j < spawnedEnemies; j++) {
 
-                        // 半径32pxの岩。重力と落下速度上限
-                        r.velocityY += 0.65f;
-                        if (r.velocityY > 18.0f) r.velocityY = 18.0f;
-                        float nextY = r.y + r.velocityY;
-
-                        // 地形と着地済みの岩の両方を床として扱う。
-                        // 1pxずつ進めて、下の岩にめり込まず上に積み重なるようにする。
-                        bool landedNow = false;
-                        float travel = nextY - r.y;
-                        while (travel > 0.0f) {
-                            float step = travel > 1.0f ? 1.0f : travel;
-                            float candidateY = r.y + step;
-                            bool blocked = false;
-
-                            // 画面外の上側は衝突とみなさない
-                            if (candidateY >= 32.0f &&
-                                CheckBossMapCollision(r.x, candidateY, 64.0f, 64.0f)) {
-                                blocked = true;
+                            if (i == j ||
+                                !enemies[j].isAlive ||
+                                enemies[j].isExploding ||
+                                enemies[j].explosionReserved) {
+                                continue;
                             }
 
-                            // 先に着地した岩の上に乗る
-                            for (int j = 0; j < kFallingRockCount && !blocked; ++j) {
-                                if (j == i || !fallingRocks[j].active || !fallingRocks[j].landed) continue;
-                                const FallingRock& other = fallingRocks[j];
-                                if (fabsf(r.x - other.x) < 64.0f &&
-                                    fabsf(candidateY - other.y) < 64.0f) {
+                            float dx = enemies[j].x - enemies[i].x;
+                            float dy = enemies[j].y - enemies[i].y;
+
+                            float distance = sqrtf(dx * dx + dy * dy);
+
+                            if (distance < chainRadius) {
+
+                                enemies[j].explosionReserved = true;
+                                enemies[j].chainTimer = chainDelay;
+                                enemies[j].isDead = true;
+
+                                float directionX =
+                                    dx >= 0.0f ? 1.0f : -1.0f;
+
+                                enemies[j].velocityX = directionX * 20.0f;
+                                enemies[j].velocityY = -12.0f;
+                            }
+                        }
+                    }
+                }
+
+                // ③ 爆発エフェクトの時間管理
+                for (int i = 0; i < spawnedEnemies; i++) {
+
+                    if (!enemies[i].isExploding) {
+                        continue;
+                    }
+
+                    enemies[i].explosionTimer--;
+
+                    if (enemies[i].explosionTimer <= 0) {
+                        enemies[i].isAlive = false;
+                        enemies[i].isExploding = false;
+                    }
+                }
+
+                //====================
+                // 落石攻撃（ボス戦）
+                //====================
+                if (scene == SCENE_GAME2) {
+
+                    if (fallingRockHitCooldown > 0) --fallingRockHitCooldown;
+                    if (!boss.isAlive) {
+                        for (int i = 0; i < kFallingRockCount; ++i) {
+                            fallingRocks[i].active = false;
+                        }
+                    }
+                    else {
+
+                        // スタン中は新しい落石を発生させず、攻撃タイマーも停止する。
+                        if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) ++fallingRockAttackTimer;
+                        // 約6秒ごとに最大4個追加。着地済みの岩は再利用しない
+                        if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) &&
+                            fallingRockAttackTimer >= (bossPhase == 2 ? 270 : 360) && chargePhase == 0) {
+                            fallingRockAttackTimer = 0;
+                            const int fallingSpawnCount = (bossPhase == 2) ? 8 : 4;
+                            for (int spawn = 0; spawn < fallingSpawnCount; ++spawn) {
+                                int slot = -1;
+                                for (int i = 0; i < kFallingRockCount; ++i) {
+                                    if (!fallingRocks[i].active) { slot = i; break; }
+                                }
+                                if (slot < 0) break;
+                                FallingRock& r = fallingRocks[slot];
+                                r = FallingRock{};
+                                r.active = true;
+                                r.falling = false;
+                                r.landed = false;
+                                r.y = -64.0f;
+                                r.warningTimer = 55 + spawn * 12;
+                                // 第2フェーズはプレイヤー周辺の広い範囲へ落とす。
+                                float offset = spawn == 0 ? 0.0f :
+                                    (float)(rand() % (bossPhase == 2 ? 881 : 401) - (bossPhase == 2 ? 440 : 200));
+                                r.x = player.x + offset;
+                                if (r.x < 80.0f) r.x = 80.0f;
+                                if (r.x > 1200.0f) r.x = 1200.0f;
+                            }
+                        }
+
+                        for (int i = 0; i < kFallingRockCount; ++i) {
+                            FallingRock& r = fallingRocks[i];
+                            if (!r.active) continue;
+
+                            // 落下中・着地済みのどちらも爆弾で破壊できる。
+                            // 岩の矩形と爆風の円の最短距離で判定する。
+                            bool broken = false;
+                            for (int j = 0; j < kBombCount; ++j) {
+                                if (!bombs[j].isActive || !bombs[j].isExplosion) continue;
+                                float dx = fabsf(bombs[j].x - r.x) - 32.0f;
+                                float dy = fabsf(bombs[j].y - r.y) - 32.0f;
+                                if (dx < 0.0f) dx = 0.0f;
+                                if (dy < 0.0f) dy = 0.0f;
+                                if (dx * dx + dy * dy <= explosionRadius * explosionRadius) {
+                                    broken = true;
+                                    break;
+                                }
+                            }
+                            if (broken) {
+                                SpawnBreakParticles(r.x - 16.0f, r.y - 16.0f);
+                                r.active = false;
+                                r.landed = false;
+                                continue;
+                            }
+                            if (r.landed) continue;
+
+                            if (!r.falling) {
+                                --r.warningTimer;
+                                if (r.warningTimer <= 0) r.falling = true;
+                                continue;
+                            }
+
+                            // 半径32pxの岩。重力と落下速度上限
+                            r.velocityY += 0.65f;
+                            if (r.velocityY > 18.0f) r.velocityY = 18.0f;
+                            float nextY = r.y + r.velocityY;
+
+                            // 地形と着地済みの岩の両方を床として扱う。
+                            // 1pxずつ進めて、下の岩にめり込まず上に積み重なるようにする。
+                            bool landedNow = false;
+                            float travel = nextY - r.y;
+                            while (travel > 0.0f) {
+                                float step = travel > 1.0f ? 1.0f : travel;
+                                float candidateY = r.y + step;
+                                bool blocked = false;
+
+                                // 画面外の上側は衝突とみなさない
+                                if (candidateY >= 32.0f &&
+                                    CheckBossMapCollision(r.x, candidateY, 64.0f, 64.0f)) {
                                     blocked = true;
                                 }
-                            }
 
-                            if (blocked) {
-                                r.velocityY = 0.0f;
-                                r.landed = true;
-                                landedNow = true;
-                                break;
-                            }
-                            r.y = candidateY;
-                            travel -= step;
-                        }
-                        if (landedNow) continue;
+                                // 先に着地した岩の上に乗る
+                                for (int j = 0; j < kFallingRockCount && !blocked; ++j) {
+                                    if (j == i || !fallingRocks[j].active || !fallingRocks[j].landed) continue;
+                                    const FallingRock& other = fallingRocks[j];
+                                    if (fabsf(r.x - other.x) < 64.0f &&
+                                        fabsf(candidateY - other.y) < 64.0f) {
+                                        blocked = true;
+                                    }
+                                }
 
-                        // プレイヤーと接触：落石は砕け、プレイヤーは吹き飛ぶ
-                        if (fabsf(player.x - r.x) < playerWidth / 2.0f + 32.0f &&
-                            fabsf(player.y - r.y) < playerHeight / 2.0f + 32.0f) {
-                            if (fallingRockHitCooldown == 0) {
-                                TakePlayerDamage(); // HPを1減らす
-
-                                velocityY = -16.0f;
-                                velocityX = player.x < r.x ? -12.0f : 12.0f;
-                                fallingRockHitCooldown = 35;
-                                shake.backGroundFlag = true;
+                                if (blocked) {
+                                    r.velocityY = 0.0f;
+                                    r.landed = true;
+                                    landedNow = true;
+                                    break;
+                                }
+                                r.y = candidateY;
+                                travel -= step;
                             }
-                            // 接触しても落石は残る（ノックバックのみ）
+                            if (landedNow) continue;
+
+                            // プレイヤーと接触：落石は砕け、プレイヤーは吹き飛ぶ
+                            if (fabsf(player.x - r.x) < playerWidth / 2.0f + 32.0f &&
+                                fabsf(player.y - r.y) < playerHeight / 2.0f + 32.0f) {
+                                if (fallingRockHitCooldown == 0) {
+                                    TakePlayerDamage(); // HPを1減らす
+
+                                    velocityY = -16.0f;
+                                    velocityX = player.x < r.x ? -12.0f : 12.0f;
+                                    fallingRockHitCooldown = 35;
+                                    shake.backGroundFlag = true;
+                                }
+                                // 接触しても落石は残る（ノックバックのみ）
+                            }
                         }
                     }
                 }
-            }
 
-            //====================
-            // 左右からの岩挟み込み攻撃
-            //====================
-            if (scene == SCENE_GAME2) {
-                if (rockHitCooldown > 0) --rockHitCooldown;
+                //====================
+                // 左右からの岩挟み込み攻撃
+                //====================
+                if (scene == SCENE_GAME2) {
+                    if (rockHitCooldown > 0) --rockHitCooldown;
 
-                if (!boss.isAlive) {
-                    rockPhase = 0;
-                    rockLeftAlive = false;
-                    rockRightAlive = false;
-                }
-                else if (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) {
-                    // スタン中は左右の岩攻撃を停止する。
-                    rockPhase = 0;
-                    rockPhaseTimer = 0;
-                    rockLeftAlive = false;
-                    rockRightAlive = false;
-                }
-                else {
-                    if (rockPhase == 0) {
-                        // 既存の壁攻撃と重ならないよう、壁攻撃が終わった時だけ開始
-                        ++rockAttackTimer;
-                        if (rockAttackTimer >= 420 && chargePhase == 0 && bossWallX < 0 &&
-                            bossWallTimer < bossWallInterval - 60) {
-                            rockAttackTimer = 0;
-                            rockPhase = 1;
-                            rockPhaseTimer = 0;
-                            rockLeftX = -rockWidth;
-                            rockRightX = 1280.0f;
-                            rockTargetX = player.x;
-                            // ステージ内の位置に制限
-                            if (rockTargetX < 150.0f) rockTargetX = 150.0f;
-                            if (rockTargetX > 1130.0f) rockTargetX = 1130.0f;
-                            rockLeftAlive = true;
-                            rockRightAlive = true;
-                        }
+                    if (!boss.isAlive) {
+                        rockPhase = 0;
+                        rockLeftAlive = false;
+                        rockRightAlive = false;
+                    }
+                    else if (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) {
+                        // スタン中は左右の岩攻撃を停止する。
+                        rockPhase = 0;
+                        rockPhaseTimer = 0;
+                        rockLeftAlive = false;
+                        rockRightAlive = false;
                     }
                     else {
-                        ++rockPhaseTimer;
-                        if (rockPhase == 1 && rockPhaseTimer >= 60) {
-                            rockPhase = 2; rockPhaseTimer = 0;
-                        }
-                        else if (rockPhase == 2) {
-                            // 予告時のプレイヤー位置を左右から挟む。
-                            // 目標は移動中に更新しない（移動で回避可能）。
-                            const float rockSpeed = 12.0f;
-                            const float leftGoal = rockTargetX - rockWidth;
-                            const float rightGoal = rockTargetX;
-                            if (rockLeftX < leftGoal) rockLeftX += rockSpeed;
-                            if (rockRightX > rightGoal) rockRightX -= rockSpeed;
-                            if (rockLeftX > leftGoal) rockLeftX = leftGoal;
-                            if (rockRightX < rightGoal) rockRightX = rightGoal;
-
-                            // 両方が目標地点に到達したら、停止せずその場で破壊
-                            if (rockLeftX >= leftGoal && rockRightX <= rightGoal) {
-                                if (rockLeftAlive) {
-                                    for (int j = 0; j < 3; ++j) {
-                                        SpawnBreakParticles(rockLeftX + j * kTileSize,
-                                            rockY + (j % 2) * 2 * kTileSize);
-                                    }
-                                    rockLeftAlive = false;
-                                }
-                                if (rockRightAlive) {
-                                    for (int j = 0; j < 3; ++j) {
-                                        SpawnBreakParticles(rockRightX + j * kTileSize,
-                                            rockY + (j % 2) * 2 * kTileSize);
-                                    }
-                                    rockRightAlive = false;
-                                }
-                                rockPhase = 0;
+                        if (rockPhase == 0) {
+                            // 既存の壁攻撃と重ならないよう、壁攻撃が終わった時だけ開始
+                            ++rockAttackTimer;
+                            if (rockAttackTimer >= 420 && chargePhase == 0 && bossWallX < 0 &&
+                                bossWallTimer < bossWallInterval - 60) {
+                                rockAttackTimer = 0;
+                                rockPhase = 1;
                                 rockPhaseTimer = 0;
+                                rockLeftX = -rockWidth;
+                                rockRightX = 1280.0f;
+                                rockTargetX = player.x;
+                                // ステージ内の位置に制限
+                                if (rockTargetX < 150.0f) rockTargetX = 150.0f;
+                                if (rockTargetX > 1130.0f) rockTargetX = 1130.0f;
+                                rockLeftAlive = true;
+                                rockRightAlive = true;
                             }
-                        }
-
-                        // 爆発した爆弾が岩に当たれば、その側の岩を破壊
-                        if (rockPhase == 2) {
-                            for (int i = 0; i < kBombCount; ++i) {
-                                if (!bombs[i].isActive || !bombs[i].isExplosion) continue;
-                                float bx = bombs[i].x, by = bombs[i].y;
-                                float nearestY = (by < rockY) ? rockY :
-                                    ((by > rockY + rockHeight) ? rockY + rockHeight : by);
-                                if (rockLeftAlive) {
-                                    float nearestX = (bx < rockLeftX) ? rockLeftX :
-                                        ((bx > rockLeftX + rockWidth) ? rockLeftX + rockWidth : bx);
-                                    float dx = bx - nearestX, dy = by - nearestY;
-                                    if (dx * dx + dy * dy < explosionRadius * explosionRadius) {
-                                        rockLeftAlive = false;
-                                        SpawnBreakParticles(rockLeftX + rockWidth / 2, rockY + rockHeight / 2);
-                                    }
-                                }
-                                if (rockRightAlive) {
-                                    float nearestX = (bx < rockRightX) ? rockRightX :
-                                        ((bx > rockRightX + rockWidth) ? rockRightX + rockWidth : bx);
-                                    float dx = bx - nearestX, dy = by - nearestY;
-                                    if (dx * dx + dy * dy < explosionRadius * explosionRadius) {
-                                        rockRightAlive = false;
-                                        SpawnBreakParticles(rockRightX + rockWidth / 2, rockY + rockHeight / 2);
-                                    }
-                                }
-                            }
-                        }
-
-                        // 岩が触れたら中央方向へ吹き飛ばす（連続ヒット防止）
-                        if (rockPhase == 2 && rockHitCooldown == 0) {
-                            float pl = player.x - playerWidth / 2;
-                            float pr = player.x + playerWidth / 2;
-                            float pt = player.y - playerHeight / 2;
-                            float pb = player.y + playerHeight / 2;
-                            if (pb > rockY && pt < rockY + rockHeight) {
-                                if (rockLeftAlive && pr > rockLeftX && pl < rockLeftX + rockWidth) {
-                                    TakePlayerDamage();
-                                    player.x = rockLeftX + rockWidth + playerWidth / 2 + 1.0f;
-                                    velocityX = 15.0f; velocityY = -12.0f;
-                                    rockHitCooldown = 35;
-                                    shake.backGroundFlag = true;
-                                }
-                                else if (rockRightAlive && pr > rockRightX && pl < rockRightX + rockWidth) {
-                                    TakePlayerDamage();
-                                    player.x = rockRightX - playerWidth / 2 - 1.0f;
-                                    velocityX = -15.0f; velocityY = -12.0f;
-                                    rockHitCooldown = 35;
-                                    shake.backGroundFlag = true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            //====================
-            // ボス戦の更新
-            //====================
-            if (scene == SCENE_GAME2) {
-                if (bossDeathTimer > 0) {
-                    --bossDeathTimer;
-                    // ボス撃破演出が終わったら、残った爆弾が勝手に動き出す
-                    if (bossDeathTimer == 0 && !boss.isAlive && bossPhase == 2) {
-                        betrayalTimer = 0;
-                        betrayalStartX = boss.x;
-                        betrayalStartY = 580.0f;
-                        betrayalBombX = betrayalStartX;
-                        betrayalBombY = betrayalStartY;
-                        betrayalTargetX = player.x;
-                        betrayalTargetY = player.y;
-                    }
-                }
-                if (betrayalTimer >= 0 && betrayalTimer < 300) {
-                    ++betrayalTimer;
-                    // 40F待機→110Fかけてプレイヤーの近くまで接近
-                    if (betrayalTimer >= 40 && betrayalTimer <= 150) {
-                        float t = (betrayalTimer - 40) / 110.0f;
-                        t = t * t * (3.0f - 2.0f * t);
-                        betrayalBombX = betrayalStartX + (betrayalTargetX - betrayalStartX) * t;
-                        betrayalBombY = betrayalStartY + (betrayalTargetY - betrayalStartY) * t;
-                    }
-                }
-
-                // Phase 2: armor re-forms after the exposed-core window ends.
-                if (boss.isAlive && bossPhase == 2) {
-                    if (transformTimer > 0) {
-                        --transformTimer;
-                        boss.velocityX = 0.0f;
-                    }
-                    if (phaseChangeTimer > 0) --phaseChangeTimer;
-                    if (armorOpenTimer > 0) {
-                        --armorOpenTimer;
-                        if (armorOpenTimer == 0) {
-                            armorHp = kArmorMaxHp;
-                        }
-                    }
-                }
-
-                // 岩纏い突進（予告→突進→硬直）
-                if (chargeHitCooldown > 0) --chargeHitCooldown;
-                if (!boss.isAlive) {
-                    chargePhase = 0;
-                    chargeTimer = 0;
-                    chargeAttackTimer = 0;
-                }
-                else if (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) {
-                    chargePhase = 0;
-                    boss.velocityX = 0.0f;
-                }
-                else if (chargePhase == 0) {
-                    ++chargeAttackTimer;
-
-                    //=====================胴
-                    //胴描画、上の処理を一行にまとめたもの
-                    currentBodyFrame = ++currentBodyFrame % kBodyFPS;
-                    //目描画、上の処理を一行にまとめたもの
-                    currentEyeFrame = ++currentEyeFrame % kEyeFPS;
-                    //現在のフレームが15フレーム以上になったら
-                    if (currentBodyFrame % (kBodyFPS / kMaxBodyAnimationFrame) == 0) {
-                        //アニメーションフレームを加算
-                        currentBodyAnimationFrame++;
-                    }
-                    //7以上になったら
-                    if (currentBodyAnimationFrame >= kMaxBodyAnimationFrame) {
-                        //0に戻す
-                        currentBodyAnimationFrame = 0;
-                    }
-                    //=====================↑↑↑
-                    // =====================目
-                    //現在のフレームが15フレーム以上になったら
-                    if (currentEyeFrame % (kEyeFPS / kMaxEyeAnimationFrame) == 0) {
-                        //アニメーションフレームを加算
-                        currentEyeAnimationFrame++;
-                    }
-                    //10以上になったら
-                    if (currentEyeAnimationFrame >= kMaxEyeAnimationFrame) {
-                        //0に戻す
-                        currentEyeAnimationFrame = 0;
-                    }
-                    //=====================↑↑↑
-
-                    bool otherAttacking = bossWallX >= 0 || rockPhase != 0;
-                    for (int i = 0; i < kFallingRockCount; ++i) {
-                        if (fallingRocks[i].active && !fallingRocks[i].landed) {
-                            otherAttacking = true;
-                            break;
-                        }
-                    }
-                    if (chargeAttackTimer >= chargeInterval && !otherAttacking &&
-                        bossWallTimer < bossWallInterval - 100 &&
-                        rockAttackTimer < 300 && fallingRockAttackTimer < 240) {
-                        chargePhase = 1;
-                        chargeTimer = 0;
-                        chargeAttackTimer = 0;
-                        chargeDirection = player.x < boss.x ? -1 : 1;
-                        boss.velocityX = 0.0f;
-                    }
-                }
-                else if (chargePhase == 1) {
-                    boss.velocityX = 0.0f;
-                    if (++chargeTimer >= chargeWarningTime) {
-                        chargePhase = 2;
-                        chargeTimer = 0;
-                    }
-                }
-                else if (chargePhase == 2) {
-                    ++chargeTimer;
-                    // 高速移動でも壁をすり抜けないよう、小刻みに判定
-                    bool hitWall = false;
-                    for (int step = 0; step < 6; ++step) {
-                        float nextBossX = boss.x + chargeDirection * chargeSpeed / 6.0f;
-                        if (CheckBossMapCollision(nextBossX, boss.y,
-                            boss.width, boss.height)) {
-                            hitWall = true;
-                            break;
-                        }
-                        boss.x = nextBossX;
-                    }
-                    if (chargeHitCooldown == 0 &&
-                        fabsf(player.x - boss.x) < (playerWidth + boss.width) * 0.5f &&
-                        fabsf(player.y - boss.y) < (playerHeight + boss.height) * 0.5f) {
-
-                        TakePlayerDamage();
-
-                        velocityX = chargeDirection * 20.0f;
-                        velocityY = -12.0f;
-                        chargeHitCooldown = 45;
-                        shake.backGroundFlag = true;
-                        shake.duration = 10;
-                    }
-                    if (hitWall || chargeTimer >= chargeDuration) {
-                        chargePhase = 3;
-                        chargeTimer = 0;
-                    }
-                }
-                else if (chargePhase == 3) {
-                    boss.velocityX = 0.0f;
-                    if (++chargeTimer >= chargeRecoveryTime) {
-                        chargePhase = 0;
-                        chargeTimer = 0;
-                    }
-                }
-
-                // 壁攻撃の予告・せり上がり・接触ノックバック
-                if (playerWallHitCooldown > 0) --playerWallHitCooldown;
-                if (boss.isAlive && !(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) {
-                    if (chargePhase == 0) ++bossWallTimer;
-                    // 予告開始時に攻撃位置を確定（途中でプレイヤーが動いても追わない）
-                    if (bossWallTimer == bossWallInterval) {
-                        bossWallX = (int)(player.x / kTileSize);
-                        // 第2フェーズは中心列から左右2列ずつ、計5列の地面攻撃。
-                        int halfWidth = (bossPhase == 2) ? 2 : 0;
-                        if (bossWallX < 2 + halfWidth) bossWallX = 2 + halfWidth;
-                        if (bossWallX > kBossMapWidth - 3 - halfWidth) bossWallX = kBossMapWidth - 3 - halfWidth;
-                        bossWallRiseCount = 0;
-                    }
-                    if (bossWallX >= 0 && bossWallTimer >= bossWallInterval + bossWallWarning) {
-                        int elapsed = bossWallTimer - (bossWallInterval + bossWallWarning);
-                        int wanted = 1 + elapsed / bossWallRiseStep;
-                        if (wanted > 3) wanted = 3;
-                        while (bossWallRiseCount < wanted) {
-                            int tileY = 19 - bossWallRiseCount; // 下から上へ
-                            int halfWidth = (bossPhase == 2) ? 2 : 0;
-                            for (int dx = -halfWidth; dx <= halfWidth; ++dx) {
-                                int tileX = bossWallX + dx;
-                                if (tileX >= 0 && tileX < kBossMapWidth && bossMap[tileY][tileX] == 0) {
-                                    bossMap[tileY][tileX] = 3;
-                                }
-                            }
-                            ++bossWallRiseCount;
-                        }
-                        // 壁がせり上がっている間だけプレイヤーを吹き飛ばす
-                        if (elapsed < 3 * bossWallRiseStep && playerWallHitCooldown == 0) {
-                            int halfWidth = (bossPhase == 2) ? 2 : 0;
-                            float wallLeft = (bossWallX - halfWidth) * (float)kTileSize;
-                            float wallRight = (bossWallX + halfWidth + 1) * (float)kTileSize;
-                            float wallTop = (20 - bossWallRiseCount) * (float)kTileSize;
-                            float playerLeft = player.x - playerWidth * 0.5f;
-                            float playerRight = player.x + playerWidth * 0.5f;
-                            float playerTop = player.y - playerHeight * 0.5f;
-                            float playerBottom = player.y + playerHeight * 0.5f;
-                            if (playerRight > wallLeft && playerLeft < wallRight &&
-                                playerBottom > wallTop && playerTop < 640.0f) {
-                                // マップに埋まらないよう壁の上に押し出す
-                                TakePlayerDamage();
-
-                                player.y = wallTop - playerHeight * 0.5f - 0.1f;
-                                velocityY = -18.0f;
-                                velocityX = (player.x < (wallLeft + wallRight) * 0.5f) ? -10.0f : 10.0f;
-                                playerWallHitCooldown = 45;
-                                shake.backGroundFlag = true;
-                            }
-                        }
-                        if (elapsed >= 3 * bossWallRiseStep) {
-                            bossWallTimer = 0;
-                            bossWallX = -1;
-                            bossWallRiseCount = 0;
-                        }
-                    }
-                }
-
-
-                if (boss.isAlive) {
-
-                    // 壁攻撃中かどうか
-                    bool isWallAttacking =
-                        bossWallX >= 0;
-
-                    // 左右の岩攻撃中かどうか
-                    bool isRockAttacking =
-                        rockPhase != 0;
-
-                    // 落石攻撃中かどうか
-                    bool isFallingRockAttacking = false;
-
-                    for (int i = 0; i < kFallingRockCount; i++) {
-                        if (fallingRocks[i].active &&
-                            !fallingRocks[i].landed) {
-                            isFallingRockAttacking = true;
-                            break;
-                        }
-                    }
-
-                    // いずれかの攻撃中なら移動停止
-                    bool isAttacking =
-                        isWallAttacking ||
-                        isRockAttacking ||
-                        isFallingRockAttacking ||
-                        chargePhase != 0;
-
-                    if (isAttacking || (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) {
-
-                        // ボスの移動を停止
-                        boss.velocityX = 0.0f;
-
-                    }
-                    else {
-
-                        // 攻撃していない時だけプレイヤーを追跡
-                        float dx = player.x - boss.x;
-
-                        if (dx > 10.0f) {
-                            boss.velocityX = 2.0f;
-                        }
-                        else if (dx < -10.0f) {
-                            boss.velocityX = -2.0f;
                         }
                         else {
+                            ++rockPhaseTimer;
+                            if (rockPhase == 1 && rockPhaseTimer >= 60) {
+                                rockPhase = 2; rockPhaseTimer = 0;
+                            }
+                            else if (rockPhase == 2) {
+                                // 予告時のプレイヤー位置を左右から挟む。
+                                // 目標は移動中に更新しない（移動で回避可能）。
+                                const float rockSpeed = 12.0f;
+                                const float leftGoal = rockTargetX - rockWidth;
+                                const float rightGoal = rockTargetX;
+                                if (rockLeftX < leftGoal) rockLeftX += rockSpeed;
+                                if (rockRightX > rightGoal) rockRightX -= rockSpeed;
+                                if (rockLeftX > leftGoal) rockLeftX = leftGoal;
+                                if (rockRightX < rightGoal) rockRightX = rightGoal;
+
+                                // 両方が目標地点に到達したら、停止せずその場で破壊
+                                if (rockLeftX >= leftGoal && rockRightX <= rightGoal) {
+                                    if (rockLeftAlive) {
+                                        for (int j = 0; j < 3; ++j) {
+                                            SpawnBreakParticles(rockLeftX + j * kTileSize,
+                                                rockY + (j % 2) * 2 * kTileSize);
+                                        }
+                                        rockLeftAlive = false;
+                                    }
+                                    if (rockRightAlive) {
+                                        for (int j = 0; j < 3; ++j) {
+                                            SpawnBreakParticles(rockRightX + j * kTileSize,
+                                                rockY + (j % 2) * 2 * kTileSize);
+                                        }
+                                        rockRightAlive = false;
+                                    }
+                                    rockPhase = 0;
+                                    rockPhaseTimer = 0;
+                                }
+                            }
+
+                            // 爆発した爆弾が岩に当たれば、その側の岩を破壊
+                            if (rockPhase == 2) {
+                                for (int i = 0; i < kBombCount; ++i) {
+                                    if (!bombs[i].isActive || !bombs[i].isExplosion) continue;
+                                    float bx = bombs[i].x, by = bombs[i].y;
+                                    float nearestY = (by < rockY) ? rockY :
+                                        ((by > rockY + rockHeight) ? rockY + rockHeight : by);
+                                    if (rockLeftAlive) {
+                                        float nearestX = (bx < rockLeftX) ? rockLeftX :
+                                            ((bx > rockLeftX + rockWidth) ? rockLeftX + rockWidth : bx);
+                                        float dx = bx - nearestX, dy = by - nearestY;
+                                        if (dx * dx + dy * dy < explosionRadius * explosionRadius) {
+                                            rockLeftAlive = false;
+                                            SpawnBreakParticles(rockLeftX + rockWidth / 2, rockY + rockHeight / 2);
+                                        }
+                                    }
+                                    if (rockRightAlive) {
+                                        float nearestX = (bx < rockRightX) ? rockRightX :
+                                            ((bx > rockRightX + rockWidth) ? rockRightX + rockWidth : bx);
+                                        float dx = bx - nearestX, dy = by - nearestY;
+                                        if (dx * dx + dy * dy < explosionRadius * explosionRadius) {
+                                            rockRightAlive = false;
+                                            SpawnBreakParticles(rockRightX + rockWidth / 2, rockY + rockHeight / 2);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 岩が触れたら中央方向へ吹き飛ばす（連続ヒット防止）
+                            if (rockPhase == 2 && rockHitCooldown == 0) {
+                                float pl = player.x - playerWidth / 2;
+                                float pr = player.x + playerWidth / 2;
+                                float pt = player.y - playerHeight / 2;
+                                float pb = player.y + playerHeight / 2;
+                                if (pb > rockY && pt < rockY + rockHeight) {
+                                    if (rockLeftAlive && pr > rockLeftX && pl < rockLeftX + rockWidth) {
+                                        TakePlayerDamage();
+                                        player.x = rockLeftX + rockWidth + playerWidth / 2 + 1.0f;
+                                        velocityX = 15.0f; velocityY = -12.0f;
+                                        rockHitCooldown = 35;
+                                        shake.backGroundFlag = true;
+                                    }
+                                    else if (rockRightAlive && pr > rockRightX && pl < rockRightX + rockWidth) {
+                                        TakePlayerDamage();
+                                        player.x = rockRightX - playerWidth / 2 - 1.0f;
+                                        velocityX = -15.0f; velocityY = -12.0f;
+                                        rockHitCooldown = 35;
+                                        shake.backGroundFlag = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                //====================
+                // ボス戦の更新
+                //====================
+                if (scene == SCENE_GAME2) {
+                    if (bossDeathTimer > 0) {
+                        --bossDeathTimer;
+                        // ボス撃破演出が終わったら、残った爆弾が勝手に動き出す
+                        if (bossDeathTimer == 0 && !boss.isAlive && bossPhase == 2) {
+                            betrayalTimer = 0;
+                            betrayalStartX = boss.x;
+                            betrayalStartY = 580.0f;
+                            betrayalBombX = betrayalStartX;
+                            betrayalBombY = betrayalStartY;
+                            betrayalTargetX = player.x;
+                            betrayalTargetY = player.y;
+                        }
+                    }
+                    if (betrayalTimer >= 0 && betrayalTimer < 300) {
+                        ++betrayalTimer;
+                        // 40F待機→110Fかけてプレイヤーの近くまで接近
+                        if (betrayalTimer >= 40 && betrayalTimer <= 150) {
+                            float t = (betrayalTimer - 40) / 110.0f;
+                            t = t * t * (3.0f - 2.0f * t);
+                            betrayalBombX = betrayalStartX + (betrayalTargetX - betrayalStartX) * t;
+                            betrayalBombY = betrayalStartY + (betrayalTargetY - betrayalStartY) * t;
+                        }
+                    }
+
+                    // 裏切り爆弾の爆発と暗転が終わったらSPACEでタイトルへ戻る。
+                    if (betrayalTimer >= 300 && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
+                        if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
+                        if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
+                        if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
+                        bgmVoice = Novice::PlayAudio(bgm, true, 0.5f);
+                        scene = SCENE_TITLE;
+                        titleAnimFrame = 0;
+                        titleSelect = 0;
+                        titleIdleFrames = 0;
+                        idleBombFrames = -1;
+                        fadeState = FADE_NONE;
+                        fadeAlpha = 0;
+                        betrayalTimer = -1;
+                        bossDeathTimer = 0;
+                        for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
+                    }
+
+                    // Phase 2: armor re-forms after the exposed-core window ends.
+                    if (boss.isAlive && bossPhase == 2) {
+                        if (transformTimer > 0) {
+                            --transformTimer;
+                            boss.velocityX = 0.0f;
+                        }
+                        if (phaseChangeTimer > 0) --phaseChangeTimer;
+                        if (armorOpenTimer > 0) {
+                            --armorOpenTimer;
+                            if (armorOpenTimer == 0) {
+                                armorHp = kArmorMaxHp;
+                            }
+                        }
+                    }
+
+                    // 岩纏い突進（予告→突進→硬直）
+                    if (chargeHitCooldown > 0) --chargeHitCooldown;
+                    if (!boss.isAlive) {
+                        chargePhase = 0;
+                        chargeTimer = 0;
+                        chargeAttackTimer = 0;
+                    }
+                    else if (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0)) {
+                        chargePhase = 0;
+                        boss.velocityX = 0.0f;
+                    }
+                    else if (chargePhase == 0) {
+                        ++chargeAttackTimer;
+
+                        //=====================胴
+                        //胴描画、上の処理を一行にまとめたもの
+                        currentBodyFrame = ++currentBodyFrame % kBodyFPS;
+                        //目描画、上の処理を一行にまとめたもの
+                        currentEyeFrame = ++currentEyeFrame % kEyeFPS;
+                        //現在のフレームが15フレーム以上になったら
+                        if (currentBodyFrame % (kBodyFPS / kMaxBodyAnimationFrame) == 0) {
+                            //アニメーションフレームを加算
+                            currentBodyAnimationFrame++;
+                        }
+                        //7以上になったら
+                        if (currentBodyAnimationFrame >= kMaxBodyAnimationFrame) {
+                            //0に戻す
+                            currentBodyAnimationFrame = 0;
+                        }
+                        //=====================↑↑↑
+                        // =====================目
+                        //現在のフレームが15フレーム以上になったら
+                        if (currentEyeFrame % (kEyeFPS / kMaxEyeAnimationFrame) == 0) {
+                            //アニメーションフレームを加算
+                            currentEyeAnimationFrame++;
+                        }
+                        //10以上になったら
+                        if (currentEyeAnimationFrame >= kMaxEyeAnimationFrame) {
+                            //0に戻す
+                            currentEyeAnimationFrame = 0;
+                        }
+                        //=====================↑↑↑
+
+                        bool otherAttacking = bossWallX >= 0 || rockPhase != 0;
+                        for (int i = 0; i < kFallingRockCount; ++i) {
+                            if (fallingRocks[i].active && !fallingRocks[i].landed) {
+                                otherAttacking = true;
+                                break;
+                            }
+                        }
+                        if (chargeAttackTimer >= chargeInterval && !otherAttacking &&
+                            bossWallTimer < bossWallInterval - 100 &&
+                            rockAttackTimer < 300 && fallingRockAttackTimer < 240) {
+                            chargePhase = 1;
+                            chargeTimer = 0;
+                            chargeAttackTimer = 0;
+                            chargeDirection = player.x < boss.x ? -1 : 1;
                             boss.velocityX = 0.0f;
                         }
                     }
+                    else if (chargePhase == 1) {
+                        boss.velocityX = 0.0f;
+                        if (++chargeTimer >= chargeWarningTime) {
+                            chargePhase = 2;
+                            chargeTimer = 0;
+                        }
+                    }
+                    else if (chargePhase == 2) {
+                        ++chargeTimer;
+                        // 高速移動でも壁をすり抜けないよう、小刻みに判定
+                        bool hitWall = false;
+                        for (int step = 0; step < 6; ++step) {
+                            float nextBossX = boss.x + chargeDirection * chargeSpeed / 6.0f;
+                            if (CheckBossMapCollision(nextBossX, boss.y,
+                                boss.width, boss.height)) {
+                                hitWall = true;
+                                break;
+                            }
+                            boss.x = nextBossX;
+                        }
+                        if (chargeHitCooldown == 0 &&
+                            fabsf(player.x - boss.x) < (playerWidth + boss.width) * 0.5f &&
+                            fabsf(player.y - boss.y) < (playerHeight + boss.height) * 0.5f) {
 
-                    // 座標更新
-                    boss.x += boss.velocityX;
+                            TakePlayerDamage();
 
-                    // 画面外に出さない
-                    if (boss.x < boss.width / 2.0f) {
-                        boss.x = boss.width / 2.0f;
+                            velocityX = chargeDirection * 20.0f;
+                            velocityY = -12.0f;
+                            chargeHitCooldown = 45;
+                            shake.backGroundFlag = true;
+                            shake.duration = 10;
+                        }
+                        if (hitWall || chargeTimer >= chargeDuration) {
+                            chargePhase = 3;
+                            chargeTimer = 0;
+                        }
+                    }
+                    else if (chargePhase == 3) {
+                        boss.velocityX = 0.0f;
+                        if (++chargeTimer >= chargeRecoveryTime) {
+                            chargePhase = 0;
+                            chargeTimer = 0;
+                        }
                     }
 
-                    if (boss.x > 1280.0f - boss.width / 2.0f) {
-                        boss.x = 1280.0f - boss.width / 2.0f;
-                    }
-
-                    // 無敵時間
-                    if (boss.damageCooldown > 0) {
-                        boss.damageCooldown--;
-                    }
-
-                    // 爆弾の爆発との当たり判定（フェーズ別）
-                    if (boss.damageCooldown == 0 && transformTimer == 0) {
-                        for (int i = 0; i < kBombCount; i++) {
-                            if (!bombs[i].isActive || !bombs[i].isExplosion) continue;
-                            float bombDx = boss.x - bombs[i].x;
-                            float bombDy = boss.y - bombs[i].y;
-                            float distance = sqrtf(bombDx * bombDx + bombDy * bombDy);
-                            float hitRadius = explosionRadius + boss.width / 2.0f;
-                            if (bossPhase == 2 && armorHp > 0) hitRadius += 25.0f;
-                            if (distance >= hitRadius) continue;
-
-                            // One hit per explosion; do not repeatedly hit during its 15 frames.
-                            boss.damageCooldown = explosionDuration + 5;
-                            if (bossPhase == 1) {
-                                --boss.hp;
-                                if (boss.hp <= 0) {
-                                    // Phase 1 defeat starts phase 2 instead of killing boss.
-                                    bossPhase = 2;
-
-                                    // 第一形態のBGMを停止
-                                    if (bossBgm1Voice != -1) {
-                                        Novice::StopAudio(bossBgm1Voice);
-                                        bossBgm1Voice = -1;
+                    // 壁攻撃の予告・せり上がり・接触ノックバック
+                    if (playerWallHitCooldown > 0) --playerWallHitCooldown;
+                    if (boss.isAlive && !(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) {
+                        if (chargePhase == 0) ++bossWallTimer;
+                        // 予告開始時に攻撃位置を確定（途中でプレイヤーが動いても追わない）
+                        if (bossWallTimer == bossWallInterval) {
+                            bossWallX = (int)(player.x / kTileSize);
+                            // 第2フェーズは中心列から左右2列ずつ、計5列の地面攻撃。
+                            int halfWidth = (bossPhase == 2) ? 2 : 0;
+                            if (bossWallX < 2 + halfWidth) bossWallX = 2 + halfWidth;
+                            if (bossWallX > kBossMapWidth - 3 - halfWidth) bossWallX = kBossMapWidth - 3 - halfWidth;
+                            bossWallRiseCount = 0;
+                        }
+                        if (bossWallX >= 0 && bossWallTimer >= bossWallInterval + bossWallWarning) {
+                            int elapsed = bossWallTimer - (bossWallInterval + bossWallWarning);
+                            int wanted = 1 + elapsed / bossWallRiseStep;
+                            if (wanted > 3) wanted = 3;
+                            while (bossWallRiseCount < wanted) {
+                                int tileY = 19 - bossWallRiseCount; // 下から上へ
+                                int halfWidth = (bossPhase == 2) ? 2 : 0;
+                                for (int dx = -halfWidth; dx <= halfWidth; ++dx) {
+                                    int tileX = bossWallX + dx;
+                                    if (tileX >= 0 && tileX < kBossMapWidth && bossMap[tileY][tileX] == 0) {
+                                        bossMap[tileY][tileX] = 3;
                                     }
+                                }
+                                ++bossWallRiseCount;
+                            }
+                            // 壁がせり上がっている間だけプレイヤーを吹き飛ばす
+                            if (elapsed < 3 * bossWallRiseStep && playerWallHitCooldown == 0) {
+                                int halfWidth = (bossPhase == 2) ? 2 : 0;
+                                float wallLeft = (bossWallX - halfWidth) * (float)kTileSize;
+                                float wallRight = (bossWallX + halfWidth + 1) * (float)kTileSize;
+                                float wallTop = (20 - bossWallRiseCount) * (float)kTileSize;
+                                float playerLeft = player.x - playerWidth * 0.5f;
+                                float playerRight = player.x + playerWidth * 0.5f;
+                                float playerTop = player.y - playerHeight * 0.5f;
+                                float playerBottom = player.y + playerHeight * 0.5f;
+                                if (playerRight > wallLeft && playerLeft < wallRight &&
+                                    playerBottom > wallTop && playerTop < 640.0f) {
+                                    // マップに埋まらないよう壁の上に押し出す
+                                    TakePlayerDamage();
 
-                                    // 第二形態のBGMを再生
-                                    if (bossBgm2Voice == -1) {
-                                        bossBgm2Voice = Novice::PlayAudio(bossBgm2, true, 0.5f);
-                                    }
-                                    boss.hp = kPhase2MaxHp;
-                                    boss.maxHp = kPhase2MaxHp;
-                                    armorHp = kArmorMaxHp;
-                                    armorOpenTimer = 0;
-                                    phaseChangeTimer = kTransformDuration;
-                                    transformTimer = kTransformDuration;
-                                    // 変身中は既存の攻撃を中断
-                                    boss.velocityX = 0.0f;
-                                    chargePhase = 0;
-                                    chargeTimer = 0;
-                                    rockPhase = 0;
-                                    rockPhaseTimer = 0;
-                                    rockLeftAlive = false;
-                                    rockRightAlive = false;
-                                    bossWallTimer = 0;
-                                    bossWallX = -1;
-                                    bossWallRiseCount = 0;
-                                    for (int r = 0; r < kFallingRockCount; ++r) {
-                                        if (!fallingRocks[r].landed) fallingRocks[r].active = false;
-                                    }
-                                    boss.damageCooldown = 60;
+                                    player.y = wallTop - playerHeight * 0.5f - 0.1f;
+                                    velocityY = -18.0f;
+                                    velocityX = (player.x < (wallLeft + wallRight) * 0.5f) ? -10.0f : 10.0f;
+                                    playerWallHitCooldown = 45;
                                     shake.backGroundFlag = true;
-                                    shake.duration = 15;
                                 }
                             }
-                            else if (armorOpenTimer > 0) {
-                                // Only the exposed core can take direct damage.
-                                --boss.hp;
-                                if (boss.hp <= 0) {
-                                    boss.hp = 0;
-                                    boss.isAlive = false;
-                                    bossDeathTimer = kBossDeathDuration;
-                                    boss.velocityX = 0.0f;
-                                    chargePhase = 0;
-                                    rockPhase = 0;
-                                    rockLeftAlive = false;
-                                    rockRightAlive = false;
-                                    bossWallX = -1;
-                                    bossWallRiseCount = 0;
-                                    for (int r = 0; r < kFallingRockCount; ++r) {
-                                        if (!fallingRocks[r].landed) fallingRocks[r].active = false;
+                            if (elapsed >= 3 * bossWallRiseStep) {
+                                bossWallTimer = 0;
+                                bossWallX = -1;
+                                bossWallRiseCount = 0;
+                            }
+                        }
+                    }
+
+
+                    if (boss.isAlive) {
+
+                        // 壁攻撃中かどうか
+                        bool isWallAttacking =
+                            bossWallX >= 0;
+
+                        // 左右の岩攻撃中かどうか
+                        bool isRockAttacking =
+                            rockPhase != 0;
+
+                        // 落石攻撃中かどうか
+                        bool isFallingRockAttacking = false;
+
+                        for (int i = 0; i < kFallingRockCount; i++) {
+                            if (fallingRocks[i].active &&
+                                !fallingRocks[i].landed) {
+                                isFallingRockAttacking = true;
+                                break;
+                            }
+                        }
+
+                        // いずれかの攻撃中なら移動停止
+                        bool isAttacking =
+                            isWallAttacking ||
+                            isRockAttacking ||
+                            isFallingRockAttacking ||
+                            chargePhase != 0;
+
+                        if (isAttacking || (bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) {
+
+                            // ボスの移動を停止
+                            boss.velocityX = 0.0f;
+
+                        }
+                        else {
+
+                            // 攻撃していない時だけプレイヤーを追跡
+                            float dx = player.x - boss.x;
+
+                            if (dx > 10.0f) {
+                                boss.velocityX = 2.0f;
+                            }
+                            else if (dx < -10.0f) {
+                                boss.velocityX = -2.0f;
+                            }
+                            else {
+                                boss.velocityX = 0.0f;
+                            }
+                        }
+
+                        // 座標更新
+                        boss.x += boss.velocityX;
+
+                        // 画面外に出さない
+                        if (boss.x < boss.width / 2.0f) {
+                            boss.x = boss.width / 2.0f;
+                        }
+
+                        if (boss.x > 1280.0f - boss.width / 2.0f) {
+                            boss.x = 1280.0f - boss.width / 2.0f;
+                        }
+
+                        // 無敵時間
+                        if (boss.damageCooldown > 0) {
+                            boss.damageCooldown--;
+                        }
+
+                        // 爆弾の爆発との当たり判定（フェーズ別）
+                        if (boss.damageCooldown == 0 && transformTimer == 0) {
+                            for (int i = 0; i < kBombCount; i++) {
+                                if (!bombs[i].isActive || !bombs[i].isExplosion) continue;
+                                float bombDx = boss.x - bombs[i].x;
+                                float bombDy = boss.y - bombs[i].y;
+                                float distance = sqrtf(bombDx * bombDx + bombDy * bombDy);
+                                float hitRadius = explosionRadius + boss.width / 2.0f;
+                                if (bossPhase == 2 && armorHp > 0) hitRadius += 25.0f;
+                                if (distance >= hitRadius) continue;
+
+                                // One hit per explosion; do not repeatedly hit during its 15 frames.
+                                boss.damageCooldown = explosionDuration + 5;
+                                if (bossPhase == 1) {
+                                    --boss.hp;
+                                    if (boss.hp <= 0) {
+                                        // Phase 1 defeat starts phase 2 instead of killing boss.
+                                        bossPhase = 2;
+
+                                        // 第一形態のBGMを停止
+                                        if (bossBgm1Voice != -1) {
+                                            Novice::StopAudio(bossBgm1Voice);
+                                            bossBgm1Voice = -1;
+                                        }
+
+                                        // 第二形態のBGMを再生
+                                        if (bossBgm2Voice == -1) {
+                                            bossBgm2Voice = Novice::PlayAudio(bossBgm2, true, 0.5f);
+                                        }
+                                        boss.hp = kPhase2MaxHp;
+                                        boss.maxHp = kPhase2MaxHp;
+                                        armorHp = kArmorMaxHp;
+                                        armorOpenTimer = 0;
+                                        phaseChangeTimer = kTransformDuration;
+                                        transformTimer = kTransformDuration;
+                                        // 変身中は既存の攻撃を中断
+                                        boss.velocityX = 0.0f;
+                                        chargePhase = 0;
+                                        chargeTimer = 0;
+                                        rockPhase = 0;
+                                        rockPhaseTimer = 0;
+                                        rockLeftAlive = false;
+                                        rockRightAlive = false;
+                                        bossWallTimer = 0;
+                                        bossWallX = -1;
+                                        bossWallRiseCount = 0;
+                                        for (int r = 0; r < kFallingRockCount; ++r) {
+                                            if (!fallingRocks[r].landed) fallingRocks[r].active = false;
+                                        }
+                                        boss.damageCooldown = 60;
+                                        shake.backGroundFlag = true;
+                                        shake.duration = 15;
                                     }
                                 }
-                            }
-                            else if (armorHp > 0) {
-                                --armorHp;
-                                if (armorHp <= 0) {
-                                    armorHp = 0;
-                                    armorOpenTimer = kArmorBreakWindow;
-                                    boss.damageCooldown = 45;
-                                    boss.velocityX = 0.0f;
-                                    // スタン中は全攻撃を中断。既に着地した岩は地形として残す。
-                                    chargePhase = 0;
-                                    chargeTimer = 0;
-                                    rockPhase = 0;
-                                    rockPhaseTimer = 0;
-                                    rockLeftAlive = false;
-                                    rockRightAlive = false;
-                                    bossWallTimer = 0;
-                                    bossWallX = -1;
-                                    bossWallRiseCount = 0;
-                                    for (int r = 0; r < kFallingRockCount; ++r) {
-                                        if (fallingRocks[r].active && !fallingRocks[r].landed) {
-                                            fallingRocks[r].active = false;
+                                else if (armorOpenTimer > 0) {
+                                    // Only the exposed core can take direct damage.
+                                    --boss.hp;
+                                    if (boss.hp <= 0) {
+                                        boss.hp = 0;
+                                        boss.isAlive = false;
+                                        bossDeathTimer = kBossDeathDuration;
+                                        boss.velocityX = 0.0f;
+                                        chargePhase = 0;
+                                        rockPhase = 0;
+                                        rockLeftAlive = false;
+                                        rockRightAlive = false;
+                                        bossWallX = -1;
+                                        bossWallRiseCount = 0;
+                                        for (int r = 0; r < kFallingRockCount; ++r) {
+                                            if (!fallingRocks[r].landed) fallingRocks[r].active = false;
                                         }
                                     }
-                                    shake.backGroundFlag = true;
-                                    shake.duration = 12;
-                                    SpawnBreakParticles(boss.x, boss.y);
                                 }
+                                else if (armorHp > 0) {
+                                    --armorHp;
+                                    if (armorHp <= 0) {
+                                        armorHp = 0;
+                                        armorOpenTimer = kArmorBreakWindow;
+                                        boss.damageCooldown = 45;
+                                        boss.velocityX = 0.0f;
+                                        // スタン中は全攻撃を中断。既に着地した岩は地形として残す。
+                                        chargePhase = 0;
+                                        chargeTimer = 0;
+                                        rockPhase = 0;
+                                        rockPhaseTimer = 0;
+                                        rockLeftAlive = false;
+                                        rockRightAlive = false;
+                                        bossWallTimer = 0;
+                                        bossWallX = -1;
+                                        bossWallRiseCount = 0;
+                                        for (int r = 0; r < kFallingRockCount; ++r) {
+                                            if (fallingRocks[r].active && !fallingRocks[r].landed) {
+                                                fallingRocks[r].active = false;
+                                            }
+                                        }
+                                        shake.backGroundFlag = true;
+                                        shake.duration = 12;
+                                        SpawnBreakParticles(boss.x, boss.y);
+                                    }
+                                }
+                                break;
                             }
-                            break;
                         }
                     }
                 }
-            }
 
 
-            //背景の揺れ処理
-            if (shake.backGroundFlag) {
+                //背景の揺れ処理
+                if (shake.backGroundFlag) {
 
-                backGroundRandomX = rand() % (shake.amplitude * 2 + 1) - shake.amplitude;
-                backGroundRandomY = rand() % (shake.amplitude * 2 + 1) - shake.amplitude;
+                    backGroundRandomX = rand() % (shake.amplitude * 2 + 1) - shake.amplitude;
+                    backGroundRandomY = rand() % (shake.amplitude * 2 + 1) - shake.amplitude;
 
-                shake.duration--;
+                    shake.duration--;
 
-                if (shake.duration <= 0) {
-                    shake.backGroundFlag = false;
+                    if (shake.duration <= 0) {
+                        shake.backGroundFlag = false;
 
-                    //シェイク終了時に元の位置へ戻す
-                    backGroundRandomX = 0;
-                    backGroundRandomY = 0;
-                    //初期化
-                    shake.duration = 2;
+                        //シェイク終了時に元の位置へ戻す
+                        backGroundRandomX = 0;
+                        backGroundRandomY = 0;
+                        //初期化
+                        shake.duration = 2;
+                    }
                 }
-            }
 
-            // Scroll only in the normal stage. Boss arena uses fixed camera.
-            if (scene == SCENE_GAME) {
-                float cameraTargetX = player.x - 740.0f;
-                if (cameraTargetX < 0.0f) cameraTargetX = 0.0f;
-                cameraX += (cameraTargetX - cameraX) * 0.1f;
-                if (cameraX < 0.0f) cameraX = 0.0f;
-                const float maxCameraX = kMapWidth * kTileSize - 1280.0f;
-                if (cameraX > maxCameraX) cameraX = maxCameraX;
+                // Scroll only in the normal stage. Boss arena uses fixed camera.
+                if (scene == SCENE_GAME) {
+                    float cameraTargetX = player.x - 740.0f;
+                    if (cameraTargetX < 0.0f) cameraTargetX = 0.0f;
+                    cameraX += (cameraTargetX - cameraX) * 0.1f;
+                    if (cameraX < 0.0f) cameraX = 0.0f;
+                    const float maxCameraX = kMapWidth * kTileSize - 1280.0f;
+                    if (cameraX > maxCameraX) cameraX = maxCameraX;
 
-                // 縦方向も横と同じ補間で追従。上方向は余白を許可する。
-                float cameraTargetY = player.y - 360.0f;
-                const float minCameraY = -360.0f;
-                const float maxCameraY = (kMapHeight * kTileSize > 720)
-                    ? (float)(kMapHeight * kTileSize - 720) : 0.0f;
-                if (cameraTargetY < minCameraY) cameraTargetY = minCameraY;
-                if (cameraTargetY > maxCameraY) cameraTargetY = maxCameraY;
-                cameraY += (cameraTargetY - cameraY) * 0.1f;
-                if (cameraY < minCameraY) cameraY = minCameraY;
-                if (cameraY > maxCameraY) cameraY = maxCameraY;
-            }
-            else if (scene == SCENE_GAME2) {
-                cameraX = 0.0f;
-                cameraY = 0.0f;
-            }
+                    // 縦方向も横と同じ補間で追従。上方向は余白を許可する。
+                    float cameraTargetY = player.y - 360.0f;
+                    const float minCameraY = -360.0f;
+                    const float maxCameraY = (kMapHeight * kTileSize > 720)
+                        ? (float)(kMapHeight * kTileSize - 720) : 0.0f;
+                    if (cameraTargetY < minCameraY) cameraTargetY = minCameraY;
+                    if (cameraTargetY > maxCameraY) cameraTargetY = maxCameraY;
+                    cameraY += (cameraTargetY - cameraY) * 0.1f;
+                    if (cameraY < minCameraY) cameraY = minCameraY;
+                    if (cameraY > maxCameraY) cameraY = maxCameraY;
+                }
+                else if (scene == SCENE_GAME2) {
+                    cameraX = 0.0f;
+                    cameraY = 0.0f;
+                }
 
-            // //====================
-            //// プレイヤーの当たり判定
-            ////====================
-            // float playerLeft = player.x - playerWidth / 2.0f;
-            // float playerRight = player.x + playerWidth / 2.0f;
-            // float playerTop = player.y - playerHeight / 2.0f;
-            // float playerBottom = player.y + playerHeight / 2.0f;
+                // //====================
+                //// プレイヤーの当たり判定
+                ////====================
+                // float playerLeft = player.x - playerWidth / 2.0f;
+                // float playerRight = player.x + playerWidth / 2.0f;
+                // float playerTop = player.y - playerHeight / 2.0f;
+                // float playerBottom = player.y + playerHeight / 2.0f;
 
-             //====================
-             // 床,壁との当たり判定
-             //====================
+                 //====================
+                 // 床,壁との当たり判定
+                 //====================
 
-            if (player.x - playerWidth / 2.0f < 0.0f)
-            {
-                player.x = playerWidth / 2.0f;
-                velocityX = 0.0f;
-            }
-
-
-            if (player.y - playerHeight / 2.0f < 0.0f)
-            {
-                player.y = playerHeight / 2.0f;
-                velocityY = 0.0f;
-            }
-
-            // 壊せる壁のパーティクル更新
-            for (int i = 0; i < kMaxBreakParticles; i++)
-            {
-                if (!breakParticles[i].isActive)
+                if (player.x - playerWidth / 2.0f < 0.0f)
                 {
-                    continue;
+                    player.x = playerWidth / 2.0f;
+                    velocityX = 0.0f;
                 }
 
-                breakParticles[i].x += breakParticles[i].velocityX;
-                breakParticles[i].y += breakParticles[i].velocityY;
 
-                // 重力
-                breakParticles[i].velocityY += 0.25f;
-
-                // 空気抵抗
-                breakParticles[i].velocityX *= 0.99f;
-
-                // 寿命
-                breakParticles[i].life--;
-
-                if (breakParticles[i].life <= 0)
+                if (player.y - playerHeight / 2.0f < 0.0f)
                 {
-                    breakParticles[i].isActive = false;
+                    player.y = playerHeight / 2.0f;
+                    velocityY = 0.0f;
                 }
-            }
-            //テスト用
-            if (scene == SCENE_GAME && keys[DIK_2] && !preKeys[DIK_2]) {
 
-                // テスト移動でも通常BGMを正しい再生ハンドルで停止する
-                if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
-                if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
-                if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
-                bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
+                // 壊せる壁のパーティクル更新
+                for (int i = 0; i < kMaxBreakParticles; i++)
+                {
+                    if (!breakParticles[i].isActive)
+                    {
+                        continue;
+                    }
 
-                scene = SCENE_GAME2;
+                    breakParticles[i].x += breakParticles[i].velocityX;
+                    breakParticles[i].y += breakParticles[i].velocityY;
 
-                player.x = 200.0f;
-                player.y = 500.0f;
+                    // 重力
+                    breakParticles[i].velocityY += 0.25f;
 
-                velocityX = 0.0f;
-                velocityY = 0.0f;
-                cameraX = 0.0f;
-                for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
-                boss.x = 900.0f;
-                boss.y = 580.0f;
-                bossWallTimer = 0;
-                bossWallX = -1;
-                bossWallRiseCount = 0;
-                playerWallHitCooldown = 0;
-                InitBossMap();
-                rockAttackTimer = 0;
-                rockPhase = 0;
-                rockPhaseTimer = 0;
-                rockLeftX = -rockWidth;
-                rockRightX = 1280.0f;
-                rockTargetX = player.x;
-                rockLeftAlive = false;
-                rockRightAlive = false;
-                rockHitCooldown = 0;
-                fallingRockAttackTimer = 0;
-                fallingRockHitCooldown = 0;
-                chargePhase = 0;
-                chargeTimer = 0;
-                chargeAttackTimer = 0;
-                chargeHitCooldown = 0;
-                for (int i = 0; i < kFallingRockCount; ++i) {
-                    fallingRocks[i] = FallingRock{};
+                    // 空気抵抗
+                    breakParticles[i].velocityX *= 0.99f;
+
+                    // 寿命
+                    breakParticles[i].life--;
+
+                    if (breakParticles[i].life <= 0)
+                    {
+                        breakParticles[i].isActive = false;
+                    }
                 }
-            }
+                //テスト用
+                if (scene == SCENE_GAME && keys[DIK_2] && !preKeys[DIK_2]) {
 
-        } // mapEditorModeでない場合の通常更新処理
-       // HPが0になったらゲームオーバーにする
-        if ((scene == SCENE_GAME || scene == SCENE_GAME2) && playerHP <= 0)
-        {
-            scene = SCENE_GAMEOVER;
+                    // テスト移動でも通常BGMを正しい再生ハンドルで停止する
+                    if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
+                    if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
+                    if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
+                    bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
+
+                    scene = SCENE_GAME2;
+
+                    player.x = 200.0f;
+                    player.y = 500.0f;
+
+                    velocityX = 0.0f;
+                    velocityY = 0.0f;
+                    cameraX = 0.0f;
+                    for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
+                    boss.x = 900.0f;
+                    boss.y = 580.0f;
+                    bossWallTimer = 0;
+                    bossWallX = -1;
+                    bossWallRiseCount = 0;
+                    playerWallHitCooldown = 0;
+                    InitBossMap();
+                    rockAttackTimer = 0;
+                    rockPhase = 0;
+                    rockPhaseTimer = 0;
+                    rockLeftX = -rockWidth;
+                    rockRightX = 1280.0f;
+                    rockTargetX = player.x;
+                    rockLeftAlive = false;
+                    rockRightAlive = false;
+                    rockHitCooldown = 0;
+                    fallingRockAttackTimer = 0;
+                    fallingRockHitCooldown = 0;
+                    chargePhase = 0;
+                    chargeTimer = 0;
+                    chargeAttackTimer = 0;
+                    chargeHitCooldown = 0;
+                    for (int i = 0; i < kFallingRockCount; ++i) {
+                        fallingRocks[i] = FallingRock{};
+                    }
+                }
+
+            } // mapEditorModeでない場合の通常更新処理
+           // HPが0になったらゲームオーバーにする
+            if ((scene == SCENE_GAME || scene == SCENE_GAME2) && playerHP <= 0)
+            {
+                scene = SCENE_GAMEOVER;
+            }
         }
-}
         ///
         /// ↑更新処理
         ///
@@ -3097,6 +3118,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             0xFFAA00FF,
                             kFillModeSolid
                         );
+                        // BOOM!：爆発地点の少し上に表示し、徐々に拡大
+                        float boomProgress = 1.0f -
+                            (float)bombs[i].explosionTimer / (float)explosionDuration;
+                        float boomScale = 0.65f + boomProgress * 0.65f;
+                        int boomW = (int)(128.0f * boomScale);
+                        int boomH = (int)(64.0f * boomScale);
+                        Novice::DrawSprite(
+                            (int)(screenX - boomW / 2),
+                            (int)(screenY - 55 - boomH / 2),
+                            boomTexture, boomScale, boomScale, 0.0f, WHITE);
                     }
                 }
             }
@@ -3134,8 +3165,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                     // 敵を描画
                     Novice::DrawSprite(
-                        (int)(enemies[e].x - cameraX -  35.0f) + backGroundRandomX,
-                        (int)(enemies[e].y - cameraY -  43.0f) + backGroundRandomY,
+                        (int)(enemies[e].x - cameraX - 35.0f) + backGroundRandomX,
+                        (int)(enemies[e].y - cameraY - 43.0f) + backGroundRandomY,
                         enemy1Handles[currentEnemyAnimationFrame],
                         1.0f,
                         1.0f,
@@ -3155,7 +3186,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 kFillModeWireFrame
             );
 
-        } 
+        }
         else if (scene == SCENE_GAME2)
         {
             Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x202030FF, kFillModeSolid);
@@ -3253,6 +3284,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     int size = (int)(explosionRadius * 2.0f * progress);
                     Novice::DrawBox(bx - size / 2, by - size / 2,
                         size, size, 0.0f, 0xFFAA00FF, kFillModeSolid);
+                    // BOOM!：爆発地点の少し上に表示し、徐々に拡大
+                    float boomProgress = 1.0f -
+                        (float)bombs[i].explosionTimer / (float)explosionDuration;
+                    float boomScale = 0.65f + boomProgress * 0.65f;
+                    int boomW = (int)(128.0f * boomScale);
+                    int boomH = (int)(64.0f * boomScale);
+                    Novice::DrawSprite(
+                        (int)(bx - boomW / 2),
+                        (int)(by - 55 - boomH / 2),
+                        boomTexture, boomScale, boomScale, 0.0f, WHITE);
                 }
             }
 
@@ -3534,6 +3575,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x000000FF, kFillModeSolid);
                     Novice::ScreenPrintf(520, 320, "THE END ...?");
                     Novice::ScreenPrintf(480, 350, "BETRAYED BY YOUR BOMB!");
+                    if (t >= 300 && (t / 30) % 2 == 0) {
+                        Novice::ScreenPrintf(480, 405, "PRESS SPACE TO TITLE");
+                    }
                 }
             }
 
@@ -3653,6 +3697,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         0xFFAA00FF,
                         kFillModeSolid
                     );
+                    // BOOM!：爆発地点の少し上に表示し、徐々に拡大
+                    float boomProgress = 1.0f -
+                        (float)bombs[i].explosionTimer / (float)explosionDuration;
+                    float boomScale = 0.65f + boomProgress * 0.65f;
+                    int boomW = (int)(128.0f * boomScale);
+                    int boomH = (int)(64.0f * boomScale);
+                    Novice::DrawSprite(
+                        (int)(bx - boomW / 2),
+                        (int)(by - 55 - boomH / 2),
+                        boomTexture, boomScale, boomScale, 0.0f, WHITE);
                 }
             }
 
@@ -3676,7 +3730,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 30, 95,
                 "TAB : RETURN TO TITLE"
             );
-        } else if (scene == SCENE_GAMEOVER)
+        }
+        else if (scene == SCENE_GAMEOVER)
         {
             Novice::DrawBox(
                 0, 0, 1280, 720,
