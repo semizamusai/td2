@@ -682,6 +682,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     // 第二形態への変身演出（3秒）：岩を吸い寄せて鎧を作る
     const int kTransformDuration = 180;
     int transformTimer = 0;
+    // ボス撃破演出：150Fの崩壊アニメーション
+    const int kBossDeathDuration = 240;
+    int bossDeathTimer = 0;
 
     // ボスの壊せる壁生成攻撃（60FPSで約3秒ごと）
     // 壁攻撃：予告60F → 3段せり上がり(各10F) → 次の攻撃まで待機
@@ -1140,6 +1143,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         armorOpenTimer = 0;
                         phaseChangeTimer = 0;
                         transformTimer = 0;
+                        bossDeathTimer = 0;
                         bossWallTimer = 0;
                         bossWallX = -1;
                         bossWallRiseCount = 0;
@@ -1928,6 +1932,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // ボス戦の更新
             //====================
             if (scene == SCENE_GAME2) {
+                if (bossDeathTimer > 0) --bossDeathTimer;
 
                 // Phase 2: armor re-forms after the exposed-core window ends.
                 if (boss.isAlive && bossPhase == 2) {
@@ -2219,6 +2224,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                 if (boss.hp <= 0) {
                                     boss.hp = 0;
                                     boss.isAlive = false;
+                                    bossDeathTimer = kBossDeathDuration;
+                                    boss.velocityX = 0.0f;
+                                    chargePhase = 0;
+                                    rockPhase = 0;
+                                    rockLeftAlive = false;
+                                    rockRightAlive = false;
+                                    bossWallX = -1;
+                                    bossWallRiseCount = 0;
+                                    for (int r = 0; r < kFallingRockCount; ++r) {
+                                        if (!fallingRocks[r].landed) fallingRocks[r].active = false;
+                                    }
                                 }
                             }
                             else if (armorHp > 0) {
@@ -2892,6 +2908,113 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     Novice::ScreenPrintf(480, 170, "ROCK ARMOR FORMING... %d%%",
                         (kTransformDuration - transformTimer) * 100 / kTransformDuration);
                 }
+            }
+
+            // ===== ボス撃破：多段爆発・岩石の飛散・閃光・衝撃波 =====
+            if (bossDeathTimer > 0) {
+                const int t = kBossDeathDuration - bossDeathTimer;
+                const float tau = 6.283185307f;
+                const int cx = (int)boss.x;
+                const int cy = (int)boss.y;
+
+                // 序盤はコアが震え、ひび割れたような放射状の光が走る
+                if (t < 65) {
+                    int jx = (t % 4 < 2) ? -5 : 5;
+                    int jy = (t % 6 < 3) ? -3 : 3;
+                    int r = 28 + (int)(7.0f * sinf(t * 0.65f));
+                    Novice::DrawEllipse(cx + jx, cy + jy, r, r, 0.0f,
+                        (t / 3) % 2 ? 0xFF7733FF : 0xFFFFAAFF, kFillModeSolid);
+                    for (int i = 0; i < 12; ++i) {
+                        float a = tau * i / 12.0f + t * 0.018f;
+                        int inner = 32;
+                        int outer = 60 + t * 2 + (i % 3) * 13;
+                        Novice::DrawLine(cx + (int)(cosf(a) * inner),
+                            cy + (int)(sinf(a) * inner),
+                            cx + (int)(cosf(a) * outer),
+                            cy + (int)(sinf(a) * outer),
+                            i % 2 ? 0xFFAA44FF : 0xFFFF88FF);
+                    }
+                }
+
+                // 岩の破片：最初の爆発で大量に飛び散り、重力で落ちる
+                for (int i = 0; i < 52; ++i) {
+                    float a = tau * (float)((i * 37) % 53) / 53.0f;
+                    float speed = 2.8f + (i % 7) * 0.8f;
+                    float dt = (float)t;
+                    int x = cx + (int)(cosf(a) * speed * dt);
+                    int y = cy + (int)(sinf(a) * speed * dt + 0.034f * dt * dt);
+                    if (x < -30 || x > 1310 || y < -30 || y > 660) continue;
+                    int size = 5 + (i % 5) * 4;
+                    unsigned int color = (i % 5 == 0) ? 0xFF9933FF :
+                        ((i % 3 == 0) ? 0xAAAAAAFF : 0x666666FF);
+                    Novice::DrawBox(x - size / 2, y - size / 2,
+                        size, size, a + t * (i % 2 ? 0.08f : -0.07f),
+                        color, kFillModeSolid);
+                }
+
+                // 三段階の連続爆発（65F / 88F / 112F）
+                const int burstTimes[3] = { 65, 88, 112 };
+                for (int b = 0; b < 3; ++b) {
+                    int age = t - burstTimes[b];
+                    if (age < 0 || age >= 55) continue;
+                    int bx = cx + (b - 1) * 55;
+                    int by = cy + ((b % 2) ? -32 : 25);
+                    int outer = age * (b == 2 ? 16 : 10);
+                    int inner = outer - 17;
+                    if (inner < 0) inner = 0;
+                    Novice::DrawEllipse(bx, by, outer, outer, 0.0f,
+                        b == 2 ? 0xFFFF66FF : 0xFF8833FF, kFillModeWireFrame);
+                    if (age < 20) {
+                        int fire = (20 - age) * (b == 2 ? 9 : 6);
+                        Novice::DrawEllipse(bx, by, fire, fire, 0.0f,
+                            age < 7 ? 0xFFFFFFFF : 0xFFAA33FF, kFillModeSolid);
+                    }
+                    // 放射状の火花
+                    for (int i = 0; i < 24; ++i) {
+                        float a = tau * i / 24.0f + b * 0.3f;
+                        int d1 = 25 + age * (5 + i % 3);
+                        int d2 = d1 + 12 + (i % 4) * 9;
+                        Novice::DrawLine(bx + (int)(cosf(a) * d1),
+                            by + (int)(sinf(a) * d1),
+                            bx + (int)(cosf(a) * d2),
+                            by + (int)(sinf(a) * d2),
+                            i % 2 ? 0xFFDD55FF : 0xFFFFFFFF);
+                    }
+                }
+
+                // 最終爆発時の画面フラッシュ。後半はフェードアウト
+                if (t >= 112 && t < 129) {
+                    unsigned int alpha = (unsigned int)((129 - t) * 13);
+                    if (alpha > 255) alpha = 255;
+                    Novice::DrawBox(0, 0, 1280, 720, 0.0f,
+                        0xFFFFFF00 | alpha, kFillModeSolid);
+                }
+                // 余韻：大きな衝撃波と消えゆく火の粉
+                if (t >= 120 && t < 210) {
+                    int age = t - 120;
+                    int radius = age * 17;
+                    Novice::DrawEllipse(cx, cy, radius, radius, 0.0f,
+                        0xFFAA44FF, kFillModeWireFrame);
+                    for (int i = 0; i < 32; ++i) {
+                        float a = tau * (float)i / 32.0f;
+                        int d = age * (3 + i % 4);
+                        int x = cx + (int)(cosf(a) * d);
+                        int y = cy + (int)(sinf(a) * d) + age * age / 45;
+                        if (x >= 0 && x < 1280 && y >= 0 && y < 640) {
+                            Novice::DrawBox(x, y, 3 + i % 4, 3 + i % 4,
+                                0.0f, i % 2 ? 0xFFBB44FF : 0xFFFFAAFF,
+                                kFillModeSolid);
+                        }
+                    }
+                }
+                if (t >= 155) {
+                    Novice::ScreenPrintf(544, 235, "BOSS DEFEATED!");
+                    Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
+                }
+            }
+            if (!boss.isAlive && bossPhase == 2 && bossDeathTimer == 0) {
+                Novice::ScreenPrintf(544, 235, "BOSS DEFEATED!");
+                Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
             }
 
             // HPバーの背景
