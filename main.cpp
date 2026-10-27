@@ -792,6 +792,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     // タイトル画面の最背面背景
     int usiro = Novice::LoadTexture("./Resources/usiro.png");
 
+    // チュートリアル背景画像
+    int tutorialBgTexture =
+        Novice::LoadTexture("./Resources/tyutoriaruBg.png");
+
     // 爆裂!! CHAIN POP!! タイトルロゴ
     int bakuretu = Novice::LoadTexture("./Resources/bakuretu.png");
     int select = Novice::LoadTexture("./Resources/select.png");
@@ -816,6 +820,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int bombTexture =
         Novice::LoadTexture("./Resources/bomb.png");
 
+    // ボス攻撃予告の「！」画像
+    int bossWarningTexture =
+        Novice::LoadTexture("./Resources/!.png");
+
     // プレイヤーの爆弾が爆発したときの文字画像（128x64）
     int boomTexture = Novice::LoadTexture("./Resources/BOOM.png");
 
@@ -834,6 +842,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
         Novice::LoadTexture("./Resources/for.png"),   // 4/5
         Novice::LoadTexture("./Resources/five.png")   // 5/5
     };
+
+    int chanceTexture = Novice::LoadTexture("./Resources/chance.png");
 
     // 固定砲台の画像（32x32 PNG）
     int turretTexture = Novice::LoadTexture("./Resources/enemy1.png");
@@ -3230,8 +3240,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     0.0f, c, kFillModeSolid);
                 Novice::DrawBox((int)(rockTargetX - 3.0f), (int)rockY,
                     6, (int)rockHeight, 0.0f, c, kFillModeSolid);
-                Novice::ScreenPrintf(30, 455, "ROCK ATTACK!");
-                Novice::ScreenPrintf(1110, 455, "ROCK ATTACK!");
+                // 左右の岩攻撃の予告に「！」を表示
+                Novice::DrawSprite(
+                    55, 455,
+                    bossWarningTexture,
+                    1.0f, 1.0f, 0.0f, WHITE
+                );
+
+                Novice::DrawSprite(
+                    1135, 455,
+                    bossWarningTexture,
+                    1.0f, 1.0f, 0.0f, WHITE
+                );
             }
             // 岩の本体：壊せる壁と同じテクスチャを3列×5段で描画
             if (rockPhase == 2) {
@@ -3258,7 +3278,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     ? 0xFF3333AA : 0xFF333355;
                 Novice::DrawBox(warningX, 544, warningWidth, 96,
                     0.0f, warningColor, kFillModeSolid);
-                Novice::ScreenPrintf(warningX - 8, 520, "DANGER!");
+                // 壁攻撃の予告に「！」を表示
+                Novice::DrawSprite(
+                    warningX + warningWidth / 2 - 16,
+                    520,
+                    bossWarningTexture,
+                    1.0f, 1.0f, 0.0f, WHITE
+                );
             }
 
 
@@ -3395,8 +3421,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         // Exposed core: bright warning ring and countdown.
                         Novice::DrawEllipse((int)boss.x, (int)boss.y,
                             42, 42, 0.0f, 0xFFFF33FF, kFillModeWireFrame);
-                        Novice::ScreenPrintf((int)boss.x - 55, (int)boss.y - 100,
-                            "CHANCE! %d", (armorOpenTimer + 59) / 60);
+                        // CHANCE!画像を表示
+                        Novice::DrawSprite(
+                            (int)boss.x - 80,
+                            (int)boss.y - 120,
+                            chanceTexture,
+                            1.0f, 1.0f,
+                            0.0f,
+                            0xFFFFFFFF
+                        );
+
+                        // 残り時間を表示
+                        Novice::ScreenPrintf(
+                            (int)boss.x - 20,
+                            (int)boss.y - 75,
+                            "%d",
+                            (armorOpenTimer + 59) / 60
+                        );
                     }
                 }
             }
@@ -3606,16 +3647,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             );
 
         }
-        else if (scene == SCENE_TUTORIAL)
-        {
-            // 背景
-            Novice::DrawBox(
-                0, 0, 1280, 720,
-                0.0f,
-                0x202030FF,
-                kFillModeSolid
-            );
+       else if (scene == SCENE_TUTORIAL)
+       {
+           // チュートリアル背景
+           Novice::DrawSprite(
+               0, 0,
+               tutorialBgTexture,
+               1.0f, 1.0f,
+               0.0f,
+               WHITE
+           );
 
+           // ここから下の処理は、今のコードを残す
             // チュートリアル用マップを描画
             DrawTutorialMap(
                 yukaTexture,
@@ -3710,26 +3753,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
 
-            // 操作説明
-            Novice::ScreenPrintf(
-                30, 20,
-                "TUTORIAL : DESTROY THE WORD SPACE!"
-            );
-
-            Novice::ScreenPrintf(
-                30, 45,
-                "A / D : MOVE"
-            );
-
-            Novice::ScreenPrintf(
-                30, 70,
-                "SPACE : PLACE BOMB"
-            );
-
-            Novice::ScreenPrintf(
-                30, 95,
-                "TAB : RETURN TO TITLE"
-            );
         }
         else if (scene == SCENE_GAMEOVER)
         {
