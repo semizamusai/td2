@@ -822,6 +822,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     // アイテム画像
     int itemTexture = Novice::LoadTexture("./Resources/item.png");
 
+    // アイテム取得数の表示画像
+    int itemCountTextures[6] = {
+        Novice::LoadTexture("./Resources/zero.png"),  // 0/5
+        Novice::LoadTexture("./Resources/one.png"),   // 1/5
+        Novice::LoadTexture("./Resources/two.png"),   // 2/5
+        Novice::LoadTexture("./Resources/three.png"), // 3/5
+        Novice::LoadTexture("./Resources/for.png"),   // 4/5
+        Novice::LoadTexture("./Resources/five.png")   // 5/5
+    };
+
     // 固定砲台の画像（32x32 PNG）
     int turretTexture = Novice::LoadTexture("./Resources/enemy1.png");
 
@@ -2958,7 +2968,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 Novice::DrawBox(doorScreenX + 5, doorScreenY + 5, 22, 59, 0.0f, 0xAA66FFFF, kFillModeSolid);
                 Novice::DrawEllipse(doorScreenX + 23, doorScreenY + 32, 2, 2, 0.0f, 0xFFFF00FF, kFillModeSolid);
             }
-            Novice::ScreenPrintf(20, 20, "ITEM: %d / %d", collectedItems, kRequiredItems);
+            // アイテム取得数の表示
+            int itemCount = collectedItems;
+
+            // 取得数が0～5の範囲から外れないようにする
+            if (itemCount < 0) {
+                itemCount = 0;
+            }
+            if (itemCount > 5) {
+                itemCount = 5;
+            }
+
+            // 取得数に対応した画像を描画
+            Novice::DrawSprite(
+                20,
+                20,
+                itemCountTextures[itemCount],
+                1.0f,
+                1.0f,
+                0.0f,
+                WHITE
+            );
 
             // プレイヤーのHP表示
             Novice::ScreenPrintf(20, 45, "HP: %d / %d",
