@@ -856,17 +856,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     bossEyeHandles[7] = Novice::LoadTexture("./Resources/bossEye8.png");
     bossEyeHandles[8] = Novice::LoadTexture("./Resources/bossEye9.png");
     bossEyeHandles[9] = Novice::LoadTexture("./Resources/bossEye10.png");
+    //そこら辺の敵1
+    int enemy1Handles[9]{};
+    enemy1Handles[0] = Novice::LoadTexture("./Resources/enemyZako1.png");
+    enemy1Handles[1] = Novice::LoadTexture("./Resources/enemyZako2.png");
+    enemy1Handles[2] = Novice::LoadTexture("./Resources/enemyZako3.png");
+    enemy1Handles[3] = Novice::LoadTexture("./Resources/enemyZako4.png");
+    enemy1Handles[4] = Novice::LoadTexture("./Resources/enemyZako5.png");
+    enemy1Handles[5] = Novice::LoadTexture("./Resources/enemyZako6.png");
+    enemy1Handles[6] = Novice::LoadTexture("./Resources/enemyZako7.png");
+    enemy1Handles[7] = Novice::LoadTexture("./Resources/enemyZako8.png");
+    enemy1Handles[8] = Novice::LoadTexture("./Resources/enemyZako9.png");
 
     const int kBodyFPS = 80;
     const int kEyeFPS = 150;
+    const int kEnemyFPS = 120;//雑魚敵のフレーム
     int currentBodyFrame = 0;
     int currentEyeFrame = 0;
+    int currentEnemyFrame = 0;//雑魚
 
     //後で調整
     const int kMaxBodyAnimationFrame = 7; //ボス体の枚数
     const int kMaxEyeAnimationFrame = 10;//ボス目の枚数
+    const int kMaxEnemyAnimationFrame = 9;//z雑魚の枚数
     int currentBodyAnimationFrame = 0;//ボス体
     int currentEyeAnimationFrame = 0;//ボス目
+    int currentEnemyAnimationFrame = 0;//雑魚
 
     int enterSE = Novice::LoadAudio("./Resources/ENTER.mp3");
 
@@ -1818,6 +1833,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             }
                         }
                     }
+
+                    //雑魚描画、上の処理を一行にまとめたもの
+                    currentEnemyFrame = ++currentEnemyFrame % kEnemyFPS;
+                    //現在のフレームがフレーム以上になったら
+                    if (currentEnemyFrame % (kEnemyFPS / kMaxEnemyAnimationFrame) == 0) {
+                        //アニメーションフレームを加算
+                        currentEnemyAnimationFrame++;
+                    }
+                    //9以上になったら
+                    if (currentEnemyAnimationFrame >= kMaxEnemyAnimationFrame) {
+                        //0に戻す
+                        currentEnemyAnimationFrame = 0;
+                    }
+                    //=====================↑↑↑
                 }
 
             //====================
@@ -3101,6 +3130,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         (int)(enemies[e].x - cameraX - 20.0f) + backGroundRandomX,
                         (int)(enemies[e].y - cameraY - 20.0f) + backGroundRandomY,
                         40, 40, 0.0f, 0xFF4444FF, kFillModeSolid
+                    );
+
+                    // 敵を描画
+                    Novice::DrawSprite(
+                        (int)(enemies[e].x - cameraX -  35.0f) + backGroundRandomX,
+                        (int)(enemies[e].y - cameraY -  43.0f) + backGroundRandomY,
+                        enemy1Handles[currentEnemyAnimationFrame],
+                        1.0f,
+                        1.0f,
+                        0.0f,
+                        WHITE
                     );
                 }
 
