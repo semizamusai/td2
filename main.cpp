@@ -845,10 +845,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
     // 爆発音
     int Explosion01 = Novice::LoadAudio("./Resources/Explosion01-1(Short).mp3");
-    int bgm = Novice::LoadAudio("./Resources/icarusnotsuiraku.mp3");
 
     int rensaSE = Novice::LoadAudio("./Resources/HIKAKIN.mp3");
-    Novice::PlayAudio(bgm, true, 0.5f);
+
+    // 通常BGM
+    int bgm = Novice::LoadAudio("./Resources/icarusnotsuiraku.mp3");
+    int bgmVoice = Novice::PlayAudio(bgm, true, 0.5f);
+
+    // ボス第一形態のBGM
+    int bossBgm1 = Novice::LoadAudio("./Resources/saishuusen.mp3");
+    int bossBgm1Voice = -1;
+
+    // ボス第二形態のBGM
+    int bossBgm2 = Novice::LoadAudio("./Resources/ryunomai.mp3");
+    int bossBgm2Voice = -1;
 
     while (Novice::ProcessMessage() == 0) {
 
@@ -1191,7 +1201,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         fabsf(player.x - (doorX + 16.0f)) < playerWidth / 2.0f + 16.0f &&
                         fabsf(player.y - (doorY + 32.0f)) < playerHeight / 2.0f + 32.0f;
                     if (isTouchingDoor && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
+                        // 通常BGMを停止
+                        Novice::StopAudio(bgmVoice);
+
+                        // ボス第一形態のBGMを再生し、ハンドルを保存
+                        bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
+
                         scene = SCENE_GAME2;
+
                         player.x = 200.0f;
                         player.y = 500.0f;
                         velocityX = 0.0f;
@@ -1374,7 +1391,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         // 爆発15フレーム前に1回だけ再生
                         if (bombs[i].timer == 15)
                         {
-                            Novice::PlayAudio(Explosion01, false, 1.0f);
+                            Novice::PlayAudio(Explosion01, false, 0.5f);
                         }
 
                         if (bombs[i].timer <= 0)
@@ -1815,6 +1832,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     }
                 }
                 else {
+                    
                     // スタン中は新しい落石を発生させず、攻撃タイマーも停止する。
                     if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) ++fallingRockAttackTimer;
                     // 約6秒ごとに最大4個追加。着地済みの岩は再利用しない
@@ -2346,6 +2364,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                                 if (boss.hp <= 0) {
                                     // Phase 1 defeat starts phase 2 instead of killing boss.
                                     bossPhase = 2;
+
+                                    // 第一形態のBGMを停止
+                                    if (bossBgm1Voice != -1) {
+                                        Novice::StopAudio(bossBgm1Voice);
+                                        bossBgm1Voice = -1;
+                                    }
+
+                                    // 第二形態のBGMを再生
+                                    if (bossBgm2Voice == -1) {
+                                        bossBgm2Voice = Novice::PlayAudio(bossBgm2, true, 0.5f);
+                                    }
                                     boss.hp = kPhase2MaxHp;
                                     boss.maxHp = kPhase2MaxHp;
                                     armorHp = kArmorMaxHp;
@@ -2520,8 +2549,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
             //テスト用
             if (scene == SCENE_GAME && keys[DIK_2] && !preKeys[DIK_2]) {
-                scene = SCENE_GAME2;
 
+                // 通常BGMを停止
+                Novice::StopAudio(bgm);
+
+                scene = SCENE_GAME2;
+             
                 player.x = 200.0f;
                 player.y = 500.0f;
 
