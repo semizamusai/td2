@@ -445,7 +445,8 @@ enum Scene {
     SCENE_TITLE,
     SCENE_GAME,
     SCENE_GAME2,
-    SCENE_TUTORIAL
+    SCENE_TUTORIAL,
+    SCENE_GAMEOVER
 };
 
 enum FadeState {
@@ -622,6 +623,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
     //プレイヤー
     Vector2 player = { 640.0f, 300.0f };
+
+    // プレイヤーのHP
+    const int kPlayerMaxHP = 10;
+    int playerHP = kPlayerMaxHP;
+
+    // ダメージを受けた後の無敵時間
+    int playerDamageCooldown = 0;
+
+    // ダメージを受ける処理
+    auto TakePlayerDamage = [&]() {
+        if (playerDamageCooldown == 0 && playerHP > 0) {
+            playerHP--;
+
+            // 60フレーム（約1秒）無敵になる
+            playerDamageCooldown = 60;
+        }
+        };
 
     // カメラ
     float cameraX = 0.0f;
@@ -907,9 +925,62 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             mapEditorMode = false;
         }
 
+        // ゲームオーバー画面でRキーを押したらリトライ
+        if (scene == SCENE_GAMEOVER &&
+            keys[DIK_R] && !preKeys[DIK_R])
+        {
+            // ボス戦のBGMを停止
+            if (bossBgm1Voice != -1) {
+                Novice::StopAudio(bossBgm1Voice);
+                bossBgm1Voice = -1;
+            }
+
+            if (bossBgm2Voice != -1) {
+                Novice::StopAudio(bossBgm2Voice);
+                bossBgm2Voice = -1;
+            }
+
+            // 通常ステージのBGMを再生
+            if (bgmVoice == -1) {
+                bgmVoice = Novice::PlayAudio(bgm, true, 0.5f);
+            }
+
+            // HPを回復
+            playerHP = kPlayerMaxHP;
+            playerDamageCooldown = 0;
+
+            // プレイヤーの位置を初期化
+            player.x = 640.0f;
+            player.y = 300.0f;
+
+            // 速度をリセット
+            velocityX = 0.0f;
+            velocityY = 0.0f;
+            isGround = false;
+
+            // カメラをリセット
+            cameraX = 0.0f;
+            cameraY = 0.0f;
+
+            // 爆弾をすべて消す
+            for (int i = 0; i < kBombCount; i++)
+            {
+                bombs[i] = Bomb{};
+            }
+
+            // 通常ステージに戻る
+            scene = SCENE_GAME;
+        }
+
         ///
         /// ↓更新処理
         ///
+        if (scene != SCENE_GAMEOVER) {
+        // ダメージ後の無敵時間を減らす
+        if (playerDamageCooldown > 0) {
+            playerDamageCooldown--;
+        }
+
         if (mapEditorMode && scene == SCENE_GAME) {
             // 編集中はプレイヤーや敵などのゲーム処理を止める
             int mouseX = 0;
@@ -1628,9 +1699,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         fabsf(shot.y - player.y) < playerHeight * 0.5f + 5.0f) {
                         shot.active = false;
                         if (turretHitCooldown == 0) {
+                            TakePlayerDamage();
+
                             velocityX = shot.vx > 0 ? 12.0f : -12.0f;
                             velocityY = -9.0f;
-                            turretHitCooldown = 50; // 連続ヒット防止
+                            turretHitCooldown = 50;
                         }
                     }
                 }
@@ -1718,6 +1791,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             ((hitVertical && remainingY > 0.0f) || enemies[e].knockbackTimer <= 0))
                         {
                             enemies[e].isKnockedBack = false;
+                        }
+
+                        // 雑魚敵とプレイヤーの接触判定
+                        if (scene == SCENE_GAME &&
+                            enemies[e].isAlive &&
+                            !enemies[e].isExploding) {
+
+                            float dx = fabsf(player.x - enemies[e].x);
+                            float dy = fabsf(player.y - enemies[e].y);
+
+                            if (dx < (playerWidth + 40.0f) / 2.0f &&
+                                dy < (playerHeight + 40.0f) / 2.0f) {
+
+                                TakePlayerDamage();
+                            }
                         }
                     }
                 }
@@ -1942,6 +2030,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         if (fabsf(player.x - r.x) < playerWidth / 2.0f + 32.0f &&
                             fabsf(player.y - r.y) < playerHeight / 2.0f + 32.0f) {
                             if (fallingRockHitCooldown == 0) {
+                                TakePlayerDamage(); // HPを1減らす
+
                                 velocityY = -16.0f;
                                 velocityX = player.x < r.x ? -12.0f : 12.0f;
                                 fallingRockHitCooldown = 35;
@@ -2063,12 +2153,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             float pb = player.y + playerHeight / 2;
                             if (pb > rockY && pt < rockY + rockHeight) {
                                 if (rockLeftAlive && pr > rockLeftX && pl < rockLeftX + rockWidth) {
+                                    TakePlayerDamage();
                                     player.x = rockLeftX + rockWidth + playerWidth / 2 + 1.0f;
                                     velocityX = 15.0f; velocityY = -12.0f;
                                     rockHitCooldown = 35;
                                     shake.backGroundFlag = true;
                                 }
                                 else if (rockRightAlive && pr > rockRightX && pl < rockRightX + rockWidth) {
+                                    TakePlayerDamage();
                                     player.x = rockRightX - playerWidth / 2 - 1.0f;
                                     velocityX = -15.0f; velocityY = -12.0f;
                                     rockHitCooldown = 35;
@@ -2206,6 +2298,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     if (chargeHitCooldown == 0 &&
                         fabsf(player.x - boss.x) < (playerWidth + boss.width) * 0.5f &&
                         fabsf(player.y - boss.y) < (playerHeight + boss.height) * 0.5f) {
+
+                        TakePlayerDamage();
+
                         velocityX = chargeDirection * 20.0f;
                         velocityY = -12.0f;
                         chargeHitCooldown = 45;
@@ -2266,6 +2361,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             if (playerRight > wallLeft && playerLeft < wallRight &&
                                 playerBottom > wallTop && playerTop < 640.0f) {
                                 // マップに埋まらないよう壁の上に押し出す
+                                TakePlayerDamage();
+
                                 player.y = wallTop - playerHeight * 0.5f - 0.1f;
                                 velocityY = -18.0f;
                                 velocityX = (player.x < (wallLeft + wallRight) * 0.5f) ? -10.0f : 10.0f;
@@ -2595,9 +2692,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
 
-
         } // mapEditorModeでない場合の通常更新処理
-
+       // HPが0になったらゲームオーバーにする
+        if ((scene == SCENE_GAME || scene == SCENE_GAME2) && playerHP <= 0)
+        {
+            scene = SCENE_GAMEOVER;
+        }
+}
         ///
         /// ↑更新処理
         ///
@@ -2859,6 +2960,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
             Novice::ScreenPrintf(20, 20, "ITEM: %d / %d", collectedItems, kRequiredItems);
 
+            // プレイヤーのHP表示
+            Novice::ScreenPrintf(20, 45, "HP: %d / %d",
+                playerHP, kPlayerMaxHP);
+
             // 壊せる壁の破片を描画
             for (int i = 0; i < kMaxBreakParticles; i++)
             {
@@ -2980,11 +3085,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 kFillModeWireFrame
             );
 
-        }
+        } 
         else if (scene == SCENE_GAME2)
         {
             Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x202030FF, kFillModeSolid);
             DrawBossMap(yukaTexture, breakableYukaTexture);
+
+            // プレイヤーのHP表示
+            Novice::ScreenPrintf(20, 20, "HP: %d / %d",
+                playerHP, kPlayerMaxHP);
 
             // 落石予告と落下する岩の描画
             for (int i = 0; i < kFallingRockCount; ++i) {
@@ -3381,6 +3490,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 "BOSS HP : %d / %d",
                 boss.hp, boss.maxHp
             );
+
         }
         else if (scene == SCENE_TUTORIAL)
         {
@@ -3496,6 +3606,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 30, 95,
                 "TAB : RETURN TO TITLE"
             );
+        } else if (scene == SCENE_GAMEOVER)
+        {
+            Novice::DrawBox(
+                0, 0, 1280, 720,
+                0.0f, 0x000000FF, kFillModeSolid
+            );
+
+            Novice::ScreenPrintf(550, 300, "GAME OVER");
+            Novice::ScreenPrintf(500, 360, "PRESS R TO RETRY");
         }
 
         ///
@@ -3511,13 +3630,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             0x00000000 | ((unsigned int)fadeAlpha & 0xFF);
 
         // 画面全体に黒い四角形を重ねる
-        Novice::DrawBox(
-            0, 0,          // 描画する位置
-            1280, 720,     // 画面全体のサイズ
-            0.0f,          // 回転角度
-            fadeColor,     // 黒色＋透明度
-            kFillModeSolid // 塗りつぶし
-        );
+      // ゲームオーバー画面ではフェード用の黒い四角形を描かない
+        if (scene != SCENE_GAMEOVER)
+        {
+            Novice::DrawBox(
+                0, 0,
+                1280, 720,
+                0.0f,
+                fadeColor,
+                kFillModeSolid
+            );
+        }
 
         // ブレンド設定を元に戻す
         Novice::SetBlendMode(BlendMode::kBlendModeNormal);
