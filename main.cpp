@@ -804,6 +804,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     // アイテム画像
     int itemTexture = Novice::LoadTexture("./Resources/item.png");
 
+    // 固定砲台の画像（32x32 PNG）
+    int turretTexture = Novice::LoadTexture("./Resources/enemy1.png");
+
     //ボス体描画
     int bossBodyHandles[7]{};
     bossBodyHandles[0] = Novice::LoadTexture("./Resources/bossBody1.png");
@@ -1201,10 +1204,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         fabsf(player.x - (doorX + 16.0f)) < playerWidth / 2.0f + 16.0f &&
                         fabsf(player.y - (doorY + 32.0f)) < playerHeight / 2.0f + 32.0f;
                     if (isTouchingDoor && keys[DIK_SPACE] && !preKeys[DIK_SPACE]) {
-                        // 通常BGMを停止
-                        Novice::StopAudio(bgmVoice);
-
-                        // ボス第一形態のBGMを再生し、ハンドルを保存
+                        // BGMは再生ハンドルで停止する（音源IDでは停止できない）
+                        if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
+                        if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
+                        if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
                         bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
 
                         scene = SCENE_GAME2;
@@ -1832,7 +1835,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     }
                 }
                 else {
-                    
+
                     // スタン中は新しい落石を発生させず、攻撃タイマーも停止する。
                     if (!(bossPhase == 2 && (armorOpenTimer > 0 || transformTimer > 0))) ++fallingRockAttackTimer;
                     // 約6秒ごとに最大4個追加。着地済みの岩は再利用しない
@@ -2550,11 +2553,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             //テスト用
             if (scene == SCENE_GAME && keys[DIK_2] && !preKeys[DIK_2]) {
 
-                // 通常BGMを停止
-                Novice::StopAudio(bgm);
+                // テスト移動でも通常BGMを正しい再生ハンドルで停止する
+                if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
+                if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
+                if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
+                bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
 
                 scene = SCENE_GAME2;
-             
+
                 player.x = 200.0f;
                 player.y = 500.0f;
 
@@ -2792,12 +2798,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 int tx = (int)(turret.x - cameraX) + backGroundRandomX;
                 int ty = (int)(turret.y - cameraY) + backGroundRandomY;
                 if (tx < -60 || tx > 1340 || ty < -60 || ty > 780) continue;
-                Novice::DrawBox(tx - 20, ty - 16, 40, 32, 0.0f, 0x555B6AFF, kFillModeSolid);
-                Novice::DrawEllipse(tx, ty, 14, 14, 0.0f, 0xA0AAB8FF, kFillModeSolid);
-                Novice::DrawLine(tx, ty,
-                    tx + (int)(turret.aimX * 30.0f),
-                    ty + (int)(turret.aimY * 30.0f), 0xFF9933FF);
-                Novice::DrawEllipse(tx, ty, 6, 6, 0.0f, 0xFF5533FF, kFillModeSolid);
+                // enemy1.png は32x32、左向き。回転軸は画像内(19,16)。
+                // DrawSpriteの中心回転では軸がずれるため、DrawQuadで軸を固定する。
+                // 画像左向き(-X)から照準方向へ回す角度。
+                const float turretAngle = atan2f(turret.aimY, turret.aimX) + 3.14159265f;
+                const float cs = cosf(turretAngle);
+                const float sn = sinf(turretAngle);
+                const float scale = 1.5f;
+                const float pivotX = 19.0f;
+                const float pivotY = 16.0f;
+                // ローカル座標を回転させ、砲台の軸(tx,ty)を動かさない。
+                float lx[4] = { -pivotX, 32.0f - pivotX, -pivotX, 32.0f - pivotX };
+                float ly[4] = { -pivotY, -pivotY, 32.0f - pivotY, 32.0f - pivotY };
+                int px[4], py[4];
+                for (int v = 0; v < 4; ++v) {
+                    px[v] = (int)(tx + (lx[v] * cs - ly[v] * sn) * scale);
+                    py[v] = (int)(ty + (lx[v] * sn + ly[v] * cs) * scale);
+                }
+                Novice::DrawQuad(px[0], py[0], px[1], py[1],
+                    px[2], py[2], px[3], py[3],
+                    0, 0, 32, 32, turretTexture, WHITE);
                 for (int h = 0; h < turret.hp; ++h) {
                     Novice::DrawBox(tx - 16 + h * 12, ty - 26, 9, 4, 0.0f,
                         0x66FF66FF, kFillModeSolid);
