@@ -507,6 +507,21 @@ struct Enemy {
     int explosionTimer = 0;    // 爆発エフェクト
     int chainTimer = 0;        // 誘爆までの待ち時間
 };
+// ===== 通常ステージ：固定砲台 =====
+struct FixedTurret {
+    float x, y;
+    int hp;
+    int cooldown;
+    float aimX, aimY;
+    bool active;
+};
+struct TurretShot {
+    float x, y, vx, vy;
+    bool active;
+};
+const int kTurretCount = 5;
+const int kTurretShotCount = 60;
+
 struct Boss {
     float x;
     float y;
@@ -652,6 +667,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     Enemy enemies[kEnemyCount] = {};
     int spawnedEnemies = 0;
     const float enemySize = 40.0f;
+    // 固定砲台はワールド座標で配置（地面 y=640 の少し上）
+    FixedTurret turrets[kTurretCount] = {
+        { 800.0f, 608.0f, 3, 50, -1.0f, 0.0f, true },
+        { 1600.0f, 608.0f, 3, 85, -1.0f, 0.0f, true },
+        { 2560.0f, 608.0f, 3, 30, -1.0f, 0.0f, true },
+        { 3840.0f, 608.0f, 3, 100, -1.0f, 0.0f, true },
+        { 5120.0f, 608.0f, 3, 70, -1.0f, 0.0f, true }
+    };
+    TurretShot turretShots[kTurretShotCount] = {};
+    int turretHitCooldown = 0;
+
     ////////////////
     //ボス///////////////////////
     //////////////              //////////
@@ -1526,6 +1552,69 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
 
 
+
+            // ===== 固定砲台：プレイヤーを狙って射撃 =====
+            if (scene == SCENE_GAME && !mapEditorMode) {
+                if (turretHitCooldown > 0) --turretHitCooldown;
+                for (int t = 0; t < kTurretCount; ++t) {
+                    FixedTurret& turret = turrets[t];
+                    if (!turret.active) continue;
+                    // 爆風を受けると耐久力が減る（同じ爆発では一度だけ）
+                    for (int b = 0; b < kBombCount; ++b) {
+                        if (!bombs[b].isActive || !bombs[b].isExplosion ||
+                            bombs[b].explosionTimer != explosionDuration - 1) continue;
+                        float bx = turret.x - bombs[b].x;
+                        float by = turret.y - bombs[b].y;
+                        if (bx * bx + by * by < explosionRadius * explosionRadius) {
+                            --turret.hp;
+                            if (turret.hp <= 0) {
+                                turret.active = false;
+                                SpawnBreakParticles(turret.x, turret.y);
+                            }
+                        }
+                    }
+                    if (!turret.active) continue;
+                    float dx = player.x - turret.x;
+                    float dy = player.y - turret.y;
+                    float distance = sqrtf(dx * dx + dy * dy);
+                    if (distance > 1.0f) {
+                        turret.aimX = dx / distance;
+                        turret.aimY = dy / distance;
+                    }
+                    if (turret.cooldown > 0) --turret.cooldown;
+                    if (distance < 650.0f && distance > 45.0f && turret.cooldown <= 0) {
+                        for (int j = 0; j < kTurretShotCount; ++j) {
+                            if (turretShots[j].active) continue;
+                            turretShots[j] = { turret.x + turret.aimX * 24.0f,
+                                turret.y + turret.aimY * 24.0f,
+                                turret.aimX * 7.0f, turret.aimY * 7.0f, true };
+                            break;
+                        }
+                        turret.cooldown = 105; // 1.75秒ごとに発射
+                    }
+                }
+                for (int j = 0; j < kTurretShotCount; ++j) {
+                    TurretShot& shot = turretShots[j];
+                    if (!shot.active) continue;
+                    shot.x += shot.vx;
+                    shot.y += shot.vy;
+                    if (shot.x < 0 || shot.x >= kMapWidth * kTileSize ||
+                        shot.y < 0 || shot.y >= kMapHeight * kTileSize ||
+                        CheckMapCollision(shot.x, shot.y, 10.0f, 10.0f)) {
+                        shot.active = false;
+                        continue;
+                    }
+                    if (fabsf(shot.x - player.x) < playerWidth * 0.5f + 5.0f &&
+                        fabsf(shot.y - player.y) < playerHeight * 0.5f + 5.0f) {
+                        shot.active = false;
+                        if (turretHitCooldown == 0) {
+                            velocityX = shot.vx > 0 ? 12.0f : -12.0f;
+                            velocityY = -9.0f;
+                            turretHitCooldown = 50; // 連続ヒット防止
+                        }
+                    }
+                }
+            }
 
             //====================
             // 追跡型の敵：爆風で飛び、壁に強く衝突すると倒れる
@@ -2488,10 +2577,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
             // 0-120F: 導火線、120F: 爆発、以降: ロゴが弾む
             if (titleAnimFrame < 120) {
-                // 導火線が中央に向かって燃える
-                int fuseEndX = 200 + titleAnimFrame * 4;
-                Novice::DrawLine(200, 570, fuseEndX, 570, 0x5B3925FF);
-                int sparkX = fuseEndX;
+                // 導火線の長さは固定。火花だけが右へ進み、燃えた部分は短くなる。
+                const int fuseStartX = 200;
+                const int fuseFinishX = 680;
+                int sparkX = fuseStartX + titleAnimFrame * 4;
+                if (sparkX > fuseFinishX) sparkX = fuseFinishX;
+                // まだ燃えていない部分だけを描画（導火線が伸びない）
+                if (sparkX < fuseFinishX) {
+                    Novice::DrawLine(sparkX, 570, fuseFinishX, 570, 0x5B3925FF);
+                }
                 int sparkY = 570;
                 Novice::DrawEllipse(sparkX, sparkY, 11, 11, 0.0f, 0xFFAA20FF, kFillModeSolid);
                 Novice::DrawEllipse(sparkX, sparkY, 5, 5, 0.0f, WHITE, kFillModeSolid);
@@ -2554,7 +2648,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 const int bombX = 640, bombY = 425;
                 if (idleBombFrames < kIdleBombFuse) {
                     // 上から落下してバウンドする爆弾
-                 
+
                     float dropY = 0.0f;
                     if (idleBombFrames < 30) {
                         float u = (float)idleBombFrames / 30.0f;
@@ -2657,6 +2751,34 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             DrawMap(cameraX, cameraY,
                 yukaTexture,
                 breakableYukaTexture);
+
+            // 固定砲台と砲弾（カメラ座標に変換）
+            for (int t = 0; t < kTurretCount; ++t) {
+                const FixedTurret& turret = turrets[t];
+                if (!turret.active) continue;
+                int tx = (int)(turret.x - cameraX) + backGroundRandomX;
+                int ty = (int)(turret.y - cameraY) + backGroundRandomY;
+                if (tx < -60 || tx > 1340 || ty < -60 || ty > 780) continue;
+                Novice::DrawBox(tx - 20, ty - 16, 40, 32, 0.0f, 0x555B6AFF, kFillModeSolid);
+                Novice::DrawEllipse(tx, ty, 14, 14, 0.0f, 0xA0AAB8FF, kFillModeSolid);
+                Novice::DrawLine(tx, ty,
+                    tx + (int)(turret.aimX * 30.0f),
+                    ty + (int)(turret.aimY * 30.0f), 0xFF9933FF);
+                Novice::DrawEllipse(tx, ty, 6, 6, 0.0f, 0xFF5533FF, kFillModeSolid);
+                for (int h = 0; h < turret.hp; ++h) {
+                    Novice::DrawBox(tx - 16 + h * 12, ty - 26, 9, 4, 0.0f,
+                        0x66FF66FF, kFillModeSolid);
+                }
+            }
+            for (int j = 0; j < kTurretShotCount; ++j) {
+                if (!turretShots[j].active) continue;
+                int sx = (int)(turretShots[j].x - cameraX) + backGroundRandomX;
+                int sy = (int)(turretShots[j].y - cameraY) + backGroundRandomY;
+                if (sx >= -10 && sx <= 1290 && sy >= -10 && sy <= 730) {
+                    Novice::DrawEllipse(sx, sy, 7, 7, 0.0f, 0xFF4400FF, kFillModeSolid);
+                    Novice::DrawEllipse(sx, sy, 3, 3, 0.0f, 0xFFFF88FF, kFillModeSolid);
+                }
+            }
 
             // 取得していないアイテムを描画
             for (int iy = 0; iy < kMapHeight; ++iy) {
