@@ -685,6 +685,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     // ボス撃破演出：150Fの崩壊アニメーション
     const int kBossDeathDuration = 240;
     int bossDeathTimer = 0;
+    // ボス撃破後のオチ：裏切り爆弾がプレイヤーを追いかける
+    int betrayalTimer = -1; // -1:未開始、0～:演出中
+    float betrayalBombX = 0.0f;
+    float betrayalBombY = 0.0f;
+    float betrayalStartX = 0.0f;
+    float betrayalStartY = 0.0f;
+    float betrayalTargetX = 0.0f;
+    float betrayalTargetY = 0.0f;
 
     // ボスの壊せる壁生成攻撃（60FPSで約3秒ごと）
     // 壁攻撃：予告60F → 3段せり上がり(各10F) → 次の攻撃まで待機
@@ -1177,6 +1185,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         phaseChangeTimer = 0;
                         transformTimer = 0;
                         bossDeathTimer = 0;
+                        betrayalTimer = -1;
                         bossWallTimer = 0;
                         bossWallX = -1;
                         bossWallRiseCount = 0;
@@ -1965,7 +1974,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             // ボス戦の更新
             //====================
             if (scene == SCENE_GAME2) {
-                if (bossDeathTimer > 0) --bossDeathTimer;
+                if (bossDeathTimer > 0) {
+                    --bossDeathTimer;
+                    // ボス撃破演出が終わったら、残った爆弾が勝手に動き出す
+                    if (bossDeathTimer == 0 && !boss.isAlive && bossPhase == 2) {
+                        betrayalTimer = 0;
+                        betrayalStartX = boss.x;
+                        betrayalStartY = 580.0f;
+                        betrayalBombX = betrayalStartX;
+                        betrayalBombY = betrayalStartY;
+                        betrayalTargetX = player.x;
+                        betrayalTargetY = player.y;
+                    }
+                }
+                if (betrayalTimer >= 0 && betrayalTimer < 300) {
+                    ++betrayalTimer;
+                    // 40F待機→110Fかけてプレイヤーの近くまで接近
+                    if (betrayalTimer >= 40 && betrayalTimer <= 150) {
+                        float t = (betrayalTimer - 40) / 110.0f;
+                        t = t * t * (3.0f - 2.0f * t);
+                        betrayalBombX = betrayalStartX + (betrayalTargetX - betrayalStartX) * t;
+                        betrayalBombY = betrayalStartY + (betrayalTargetY - betrayalStartY) * t;
+                    }
+                }
 
                 // Phase 2: armor re-forms after the exposed-core window ends.
                 if (boss.isAlive && bossPhase == 2) {
@@ -2523,7 +2554,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 const int bombX = 640, bombY = 425;
                 if (idleBombFrames < kIdleBombFuse) {
                     // 上から落下してバウンドする爆弾
-                   
+                 
                     float dropY = 0.0f;
                     if (idleBombFrames < 30) {
                         float u = (float)idleBombFrames / 30.0f;
@@ -3091,9 +3122,65 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
                 }
             }
-            if (!boss.isAlive && bossPhase == 2 && bossDeathTimer == 0) {
+            if (!boss.isAlive && bossPhase == 2 && bossDeathTimer == 0 && betrayalTimer < 0) {
                 Novice::ScreenPrintf(544, 235, "BOSS DEFEATED!");
                 Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
+            }
+
+            // ===== エンディングのオチ：プレイヤーの爆弾が裏切る =====
+            if (betrayalTimer >= 0) {
+                int t = betrayalTimer;
+                if (t < 195) {
+                    // 導火線付きの爆弾を図形で描画（新規素材不要）
+                    int bx = (int)betrayalBombX;
+                    int by = (int)betrayalBombY;
+                    Novice::DrawEllipse(bx, by, 25, 25, 0.0f, 0x222222FF, kFillModeSolid);
+                    Novice::DrawEllipse(bx - 8, by - 8, 7, 7, 0.0f, 0x888888FF, kFillModeSolid);
+                    Novice::DrawLine(bx + 6, by - 23, bx + 13, by - 39, 0xDDCC99FF);
+                    int spark = (t / 5) % 2 ? 8 : 5;
+                    Novice::DrawEllipse(bx + 13, by - 40, spark, spark, 0.0f,
+                        t > 150 ? 0xFFFFFFFF : 0xFFAA22FF, kFillModeSolid);
+                    if (t < 40) {
+                        Novice::ScreenPrintf(bx - 65, by - 88, "...?");
+                    }
+                    else if (t < 150) {
+                        Novice::ScreenPrintf(bx - 100, by - 90, "WAIT FOR ME!");
+                    }
+                    else {
+                        Novice::ScreenPrintf(540, 185, "YOU'RE NEXT!");
+                        if ((t / 4) % 2 == 0) {
+                            Novice::DrawEllipse(bx, by, 32, 32, 0.0f, 0xFF3333FF, kFillModeWireFrame);
+                        }
+                    }
+                }
+                else if (t < 255) {
+                    int age = t - 195;
+                    int bx = (int)betrayalBombX;
+                    int by = (int)betrayalBombY;
+                    // 画面フラッシュ→巨大な衝撃波と火花
+                    if (age < 7) {
+                        Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0xFFFFFFFF, kFillModeSolid);
+                    }
+                    else {
+                        int radius = age * 18;
+                        Novice::DrawEllipse(bx, by, radius, radius, 0.0f,
+                            0xFFAA22FF, kFillModeWireFrame);
+                        for (int i = 0; i < 40; ++i) {
+                            float a = 6.2831853f * i / 40.0f;
+                            float dist = age * (5.0f + (i % 6) * 1.5f);
+                            int px = bx + (int)(cosf(a) * dist);
+                            int py = by + (int)(sinf(a) * dist);
+                            Novice::DrawBox(px, py, 5 + i % 6, 5 + i % 6, a,
+                                i % 2 ? 0xFF6622FF : 0xFFFF66FF, kFillModeSolid);
+                        }
+                    }
+                }
+                else {
+                    // オチの後は暗転したまま（ゲームを勝手に終了させない）
+                    Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x000000FF, kFillModeSolid);
+                    Novice::ScreenPrintf(520, 320, "THE END ...?");
+                    Novice::ScreenPrintf(480, 350, "BETRAYED BY YOUR BOMB!");
+                }
             }
 
             // HPバーの背景
