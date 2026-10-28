@@ -3328,14 +3328,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         DrawExplosionParticles(bombs[i], cameraX, cameraY);
                         DrawExplosionFlash(screenX, screenY, progress, explosionRadius);
                         // BOOM!：爆発地点の少し上に表示し、徐々に拡大
-                        float boomProgress = 1.0f -
+                        float boomProgress = 1.5f -
                             (float)bombs[i].explosionTimer / (float)explosionDuration;
-                        float boomScale = 0.65f + boomProgress * 0.65f;
+                        float boomScale = 0.65f + boomProgress * 0.9f;
                         int boomW = (int)(128.0f * boomScale);
                         int boomH = (int)(64.0f * boomScale);
                         Novice::DrawSprite(
                             (int)(screenX - boomW / 2),
-                            (int)(screenY - 55 - boomH / 2),
+                            (int)(screenY - 75 - boomH / 2),
                             boomTexture, boomScale, boomScale, 0.0f, WHITE);
                     }
                 }
