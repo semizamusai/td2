@@ -485,7 +485,7 @@ struct ExplosionParticle {
     int radius{};
     unsigned int color{};
 };
-const int kExplosionParticleCount = 100;
+const int kExplosionParticleCount = 80;
 
 struct Bomb {
     float x{};
@@ -765,13 +765,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     float maxFallSpeed = 15.0f;
 
     // 爆弾
-    const int kBombCount = 10;
+    const int kBombCount = 5;
     Bomb bombs[kBombCount] = {};
 
     // 爆弾の設定
-    const int bombFuseTime = 60;
+    const int bombFuseTime = 35;
     const int explosionDuration = 15;
-    const float explosionRadius = 100.0f;
+    const float explosionRadius = 120.0f;
     const float bombKnockBack = 20.0f;
 
     bool isGround = false;
@@ -3366,12 +3366,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             for (int e = 0; e < spawnedEnemies; ++e)
                 if (enemies[e].isAlive)
                 {
-                    Novice::DrawBox(
-                        (int)(enemies[e].x - cameraX - 20.0f) + backGroundRandomX,
-                        (int)(enemies[e].y - cameraY - 20.0f) + backGroundRandomY,
-                        40, 40, 0.0f, 0xFF4444FF, kFillModeSolid
-                    );
-
                     // 敵を描画
                     Novice::DrawSprite(
                         (int)(enemies[e].x - cameraX - 35.0f) + backGroundRandomX,
