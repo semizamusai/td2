@@ -3206,9 +3206,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             for (int iy = 0; iy < kMapHeight; ++iy) {
                 for (int ix = 0; ix < kMapWidth; ++ix) {
                     if (map[iy][ix] == 4) {
-                        Novice::DrawBox((int)(ix * kTileSize - cameraX) + backGroundRandomX,
-                            (int)(iy * kTileSize - cameraY) + backGroundRandomY,
-                            kTileSize, kTileSize, 0.0f, RED, kFillModeWireFrame);
+                      
                         Novice::DrawSpriteRect(
                             (int)(ix * kTileSize - cameraX) + backGroundRandomX,
                             (int)(iy * kTileSize - cameraY) + backGroundRandomY,
