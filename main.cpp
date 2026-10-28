@@ -477,6 +477,16 @@ const int kMaxBreakParticles = 100;
 // パーティクル配列
 BreakParticle breakParticles[kMaxBreakParticles]{};
 
+// 爆発時に放射状へ飛ぶ火花（爆弾ごとに管理）
+struct ExplosionParticle {
+    float x{}, y{}, vx{}, vy{};
+    int life{};
+    int maxLife{};
+    int radius{};
+    unsigned int color{};
+};
+const int kExplosionParticleCount = 100;
+
 struct Bomb {
     float x{};
     float y{};
@@ -488,7 +498,89 @@ struct Bomb {
     bool isActive{};
     bool isExplosion{};
     int explosionTimer{};
+    ExplosionParticle particles[kExplosionParticleCount]{};
 };
+
+// 大きな火花・細い火花・火の粉を混ぜて爆発を派手にする
+void SpawnExplosionParticles(Bomb& bomb) {
+    const float twoPi = 6.2831853f;
+    const unsigned int colors[] = { 0xFFFFFFFF, 0xFFFFAAFF, 0xFFDD22FF, 0xFF7700FF, 0xFF3300FF };
+    for (int i = 0; i < kExplosionParticleCount; ++i) {
+        ExplosionParticle& p = bomb.particles[i];
+        float angle = twoPi * (float)i / kExplosionParticleCount
+            + (float)(rand() % 100 - 50) * 0.009f;
+        // 高速の火花とゆっくり漂う火の粉を混ぜる
+        float speed = (i % 4 == 0) ? 13.0f + (rand() % 100) * 0.12f
+            : 4.0f + (rand() % 110) * 0.10f;
+        p.x = bomb.x + cosf(angle) * (float)(rand() % 15);
+        p.y = bomb.y + sinf(angle) * (float)(rand() % 15);
+        p.vx = cosf(angle) * speed;
+        p.vy = sinf(angle) * speed;
+        p.maxLife = 11 + rand() % 8;
+        p.life = p.maxLife;
+        p.radius = (i % 5 == 0) ? 6 + rand() % 6 : 2 + rand() % 5;
+        p.color = colors[rand() % 5];
+    }
+}
+
+void UpdateExplosionParticles(Bomb& bomb) {
+    for (int i = 0; i < kExplosionParticleCount; ++i) {
+        ExplosionParticle& p = bomb.particles[i];
+        if (p.life <= 0) continue;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.94f;
+        p.vy *= 0.94f;
+        --p.life;
+    }
+}
+
+void DrawExplosionParticles(const Bomb& bomb, float cameraX, float cameraY) {
+    for (int i = 0; i < kExplosionParticleCount; ++i) {
+        const ExplosionParticle& p = bomb.particles[i];
+        if (p.life <= 0) continue;
+        int radius = p.radius * p.life / p.maxLife;
+        if (radius < 1) radius = 1;
+        int x = (int)(p.x - cameraX);
+        int y = (int)(p.y - cameraY);
+        // 移動方向に長く伸びる光の軌跡
+        if (i % 3 == 0) {
+            int tailX = (int)(p.x - p.vx * 2.5f - cameraX);
+            int tailY = (int)(p.y - p.vy * 2.5f - cameraY);
+            Novice::DrawLine(x, y, tailX, tailY, p.color);
+        }
+        Novice::DrawEllipse(x, y, radius, radius, 0.0f, p.color, kFillModeSolid);
+        // 明るい火花は中心を白くする
+        if (radius >= 4 && i % 2 == 0) {
+            Novice::DrawEllipse(x, y, radius / 2, radius / 2, 0.0f,
+                0xFFFFFFFF, kFillModeSolid);
+        }
+    }
+}
+
+// 爆発の中心に白い閃光と二重の衝撃波を描く（当たり判定は変えない）
+void DrawExplosionFlash(int x, int y, float progress, float radius) {
+    float t = progress;
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    int outer = (int)(radius * (0.25f + t * 0.9f));
+    int inner = (int)(radius * (0.15f + t * 0.6f));
+    int alpha = (int)((1.0f - t) * 230.0f);
+    if (alpha < 0) alpha = 0;
+    Novice::DrawEllipse(x, y, outer, outer, 0.0f,
+        0xFFAA2200u | (unsigned int)alpha, kFillModeWireFrame);
+    Novice::DrawEllipse(x, y, inner, inner, 0.0f,
+        0xFFFF8800u | (unsigned int)alpha, kFillModeWireFrame);
+    if (t < 0.45f) {
+        float flash = 1.0f - t / 0.45f;
+        int core = (int)(radius * 0.45f * flash);
+        if (core > 0) {
+            int a = (int)(flash * 255.0f);
+            Novice::DrawEllipse(x, y, core, core, 0.0f,
+                0xFFFFFF00u | (unsigned int)a, kFillModeSolid);
+        }
+    }
+}
 
 struct Enemy {
     float x{};
@@ -1026,6 +1118,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     while (Novice::ProcessMessage() == 0) {
 
         Novice::BeginFrame();
+        for (int i = 0; i < kBombCount; ++i) {
+            UpdateExplosionParticles(bombs[i]);
+        }
 
         // 8フレームごとに次の絵へ。4コマを繰り返す。
         itemAnimationTimer++;
@@ -1616,6 +1711,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             {
                                 bombs[i].isExplosion = true;
                                 bombs[i].explosionTimer = explosionDuration;
+                                SpawnExplosionParticles(bombs[i]);
 
                                 // プレイヤーとの距離
                                 float dx = player.x - bombs[i].x;
@@ -3224,15 +3320,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                         int size = (int)(explosionRadius * 2.0f * progress);
 
-                        Novice::DrawBox(
-                            screenX - size / 2,
-                            screenY - size / 2,
-                            size,
-                            size,
-                            0.0f,
-                            0xFFAA00FF,
-                            kFillModeSolid
+                        Novice::DrawEllipse(
+                            screenX, screenY,
+                            size / 2, size / 2,
+                            0.0f, 0xFFAA00FF, kFillModeSolid
                         );
+                        DrawExplosionParticles(bombs[i], cameraX, cameraY);
+                        DrawExplosionFlash(screenX, screenY, progress, explosionRadius);
                         // BOOM!：爆発地点の少し上に表示し、徐々に拡大
                         float boomProgress = 1.0f -
                             (float)bombs[i].explosionTimer / (float)explosionDuration;
@@ -3397,8 +3491,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     float progress = 1.0f -
                         (float)bombs[i].explosionTimer / explosionDuration;
                     int size = (int)(explosionRadius * 2.0f * progress);
-                    Novice::DrawBox(bx - size / 2, by - size / 2,
-                        size, size, 0.0f, 0xFFAA00FF, kFillModeSolid);
+                    Novice::DrawEllipse(
+                        bx, by,
+                        size / 2, size / 2,
+                        0.0f, 0xFFAA00FF, kFillModeSolid
+                    );
+                    DrawExplosionParticles(bombs[i], 0.0f, 0.0f);
+                    DrawExplosionFlash(bx, by, progress, explosionRadius);
                     // BOOM!：爆発地点の少し上に表示し、徐々に拡大
                     float boomProgress = 1.0f -
                         (float)bombs[i].explosionTimer / (float)explosionDuration;
@@ -3818,15 +3917,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     int size =
                         (int)(explosionRadius * 2.0f * progress);
 
-                    Novice::DrawBox(
-                        bx - size / 2,
-                        by - size / 2,
-                        size,
-                        size,
-                        0.0f,
-                        0xFFAA00FF,
-                        kFillModeSolid
+                    Novice::DrawEllipse(
+                        bx, by,
+                        size / 2, size / 2,
+                        0.0f, 0xFFAA00FF, kFillModeSolid
                     );
+                    DrawExplosionParticles(bombs[i], 0.0f, 0.0f);
+                    DrawExplosionFlash(bx, by, progress, explosionRadius);
                     // BOOM!：爆発地点の少し上に表示し、徐々に拡大
                     float boomProgress = 1.0f -
                         (float)bombs[i].explosionTimer / (float)explosionDuration;
