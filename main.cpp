@@ -694,6 +694,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int endingA2Texture = Novice::LoadTexture("./Resources/A2_overlay.png");
     int endingA3Texture = Novice::LoadTexture("./Resources/A3_overlay.png");
     int endingA4Texture = Novice::LoadTexture("./Resources/A4_overlay.png");
+    // ゲームオーバー選択画像（1280x720）
+    int retryScreenTexture = Novice::LoadTexture("./Resources/RETRY.png");
+    int titleScreenTexture = Novice::LoadTexture("./Resources/BACK TO TITLE.png");
+    int gameOverGuideTexture = Novice::LoadTexture("./Resources/WS.png");
+    int playerRightTexture = Novice::LoadTexture("./Resources/Right.png");
+    int playerLeftTexture = Novice::LoadTexture("./Resources/Left.png");
+    int playerFacing = 1; // 1: right, -1: left
+    int playerWalkTimer = 0;
+    int playerWalkFrame = 0;
     InitBossMap();
     InitBlastJumpArea(); // 通常ステージに縦穴の足場を追加
     InitBlastGapArea(); // 通常ステージに横断用の崖を追加
@@ -721,6 +730,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
     //シーン管理
     Scene scene = SCENE_TITLE;
+    int gameOverSelect = 0; // 0: RETRY, 1: TITLE
 
     //プレイヤー
     Vector2 player = { 640.0f, 300.0f };
@@ -943,6 +953,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     int bombTexture =
         Novice::LoadTexture("./Resources/bomb.png");
 
+    // HP表示用の画像（HP.png + 残りHP分のbomb.png）
+    int hpLabelTexture = Novice::LoadTexture("./Resources/HP.png");
+
     // プレイヤーの爆弾が爆発したときの文字画像（128x64）
     int bossWarningTexture = Novice::LoadTexture("./Resources/!.png");
     int boomTexture = Novice::LoadTexture("./Resources/BOOM.png");
@@ -1162,31 +1175,45 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             mapEditorMode = false;
         }
 
-        // ゲームオーバー画面でRキーを押したらリトライ
-        if (scene == SCENE_GAMEOVER &&
-            keys[DIK_R] && !preKeys[DIK_R])
-        {
-            // ボス戦のBGMを停止
-            if (bossBgm1Voice != -1) {
-                Novice::StopAudio(bossBgm1Voice);
-                bossBgm1Voice = -1;
+        // 同じフレームの決定キーがタイトルの「ゲーム開始」に伝わるのを防ぐ
+        bool returnedToTitleFromGameOver = false;
+        // ゲームオーバー選択画面（W/S・上下キーで選択、SPACE/ENTERで決定）
+        if (scene == SCENE_GAMEOVER) {
+            if ((keys[DIK_W] && !preKeys[DIK_W]) ||
+                (keys[DIK_UP] && !preKeys[DIK_UP]) ||
+                (keys[DIK_S] && !preKeys[DIK_S]) ||
+                (keys[DIK_DOWN] && !preKeys[DIK_DOWN])) {
+                gameOverSelect = 1 - gameOverSelect;
             }
-
-            if (bossBgm2Voice != -1) {
-                Novice::StopAudio(bossBgm2Voice);
-                bossBgm2Voice = -1;
+            if ((keys[DIK_SPACE] && !preKeys[DIK_SPACE]) ||
+                (keys[DIK_RETURN] && !preKeys[DIK_RETURN])) {
+                // ボスBGMを停止し、通常BGMに戻す
+                if (bossBgm1Voice != -1) {
+                    Novice::StopAudio(bossBgm1Voice);
+                    bossBgm1Voice = -1;
+                }
+                if (bossBgm2Voice != -1) {
+                    Novice::StopAudio(bossBgm2Voice);
+                    bossBgm2Voice = -1;
+                }
+                if (bgmVoice == -1) {
+                    bgmVoice = Novice::PlayAudio(bgm, true, 0.5f);
+                }
+                ResetGameState();
+                fadeState = FADE_NONE;
+                fadeAlpha = 0;
+                if (gameOverSelect == 0) {
+                    scene = SCENE_GAME;
+                }
+                else {
+                    scene = SCENE_TITLE;
+                    returnedToTitleFromGameOver = true;
+                    titleAnimFrame = 0;
+                    titleSelect = 0;
+                    titleIdleFrames = 0;
+                    idleBombFrames = -1;
+                }
             }
-
-            // 通常ステージのBGMを再生
-            if (bgmVoice == -1) {
-                bgmVoice = Novice::PlayAudio(bgm, true, 0.5f);
-            }
-
-            // クリア後と同じ完全初期化を行う。
-            ResetGameState();
-
-            // 通常ステージに戻る
-            scene = SCENE_GAME;
         }
 
         ///
@@ -1246,7 +1273,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 }
             }
             else {
-                if (scene == SCENE_TITLE && fadeState == FADE_NONE && idleBombFrames < 0)
+                if (scene == SCENE_TITLE && !returnedToTitleFromGameOver && fadeState == FADE_NONE && idleBombFrames < 0)
                 {
                     // Aキーで左へ
                     if (keys[DIK_A] && !preKeys[DIK_A])
@@ -1398,6 +1425,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             e.knockbackTimer = 0;
                             break;
                         }
+                    }
+
+                    // プレイヤーの向きと歩行アニメーション（40x40が横3コマ）
+                    if (keys[DIK_D] || keys[DIK_RIGHT]) playerFacing = 1;
+                    else if (keys[DIK_A] || keys[DIK_LEFT]) playerFacing = -1;
+                    if (keys[DIK_D] || keys[DIK_A] || keys[DIK_RIGHT] || keys[DIK_LEFT]) {
+                        if (++playerWalkTimer >= 8) {
+                            playerWalkTimer = 0;
+                            playerWalkFrame = (playerWalkFrame + 1) % 3;
+                        }
+                    }
+                    else {
+                        playerWalkTimer = 0;
+                        playerWalkFrame = 0;
                     }
 
                     // Dキーで右移動
@@ -2443,7 +2484,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                             betrayalTargetY = player.y;
                         }
                     }
-                    if (betrayalTimer >= 0 && betrayalTimer < 675) {
+                    if (betrayalTimer >= 0) {
                         ++betrayalTimer;
                         // 40F待機→110Fかけてプレイヤーの近くまで接近
                         if (betrayalTimer >= 40 && betrayalTimer <= 150) {
@@ -2917,57 +2958,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                         breakParticles[i].isActive = false;
                     }
                 }
-                //テスト用
-                if (scene == SCENE_GAME && keys[DIK_2] && !preKeys[DIK_2]) {
 
-                    // テスト移動でも通常BGMを正しい再生ハンドルで停止する
-                    if (bgmVoice != -1) { Novice::StopAudio(bgmVoice); bgmVoice = -1; }
-                    if (bossBgm1Voice != -1) { Novice::StopAudio(bossBgm1Voice); bossBgm1Voice = -1; }
-                    if (bossBgm2Voice != -1) { Novice::StopAudio(bossBgm2Voice); bossBgm2Voice = -1; }
-                    bossBgm1Voice = Novice::PlayAudio(bossBgm1, true, 0.5f);
 
-                    scene = SCENE_GAME2;
-
-                    player.x = 200.0f;
-                    player.y = 500.0f;
-                    ResolveSpawnPosition(SCENE_GAME2);
-
-                    velocityX = 0.0f;
-                    velocityY = 0.0f;
-                    cameraX = 0.0f;
-                    for (int i = 0; i < kBombCount; ++i) bombs[i] = Bomb{};
-                    boss.x = 900.0f;
-                    boss.y = 580.0f;
-                    bossWallTimer = 0;
-                    bossWallX = -1;
-                    bossWallRiseCount = 0;
-                    playerWallHitCooldown = 0;
-                    InitBossMap();
-                    rockAttackTimer = 0;
-                    rockPhase = 0;
-                    rockPhaseTimer = 0;
-                    rockLeftX = -rockWidth;
-                    rockRightX = 1280.0f;
-                    rockTargetX = player.x;
-                    rockLeftAlive = false;
-                    rockRightAlive = false;
-                    rockHitCooldown = 0;
-                    fallingRockAttackTimer = 0;
-                    fallingRockHitCooldown = 0;
-                    chargePhase = 0;
-                    chargeTimer = 0;
-                    chargeAttackTimer = 0;
-                    chargeHitCooldown = 0;
-                    for (int i = 0; i < kFallingRockCount; ++i) {
-                        fallingRocks[i] = FallingRock{};
-                    }
-                }
 
             } // mapEditorModeでない場合の通常更新処理
            // HPが0になったらゲームオーバーにする
             if ((scene == SCENE_GAME || scene == SCENE_GAME2) && playerHP <= 0)
             {
                 scene = SCENE_GAMEOVER;
+                gameOverSelect = 0;
             }
         }
         ///
@@ -3140,11 +3139,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
             // 上部操作パネル
             Novice::DrawBox(0, 0, 1280, 64, 0.0f, 0x15151FFF, kFillModeSolid);
-            Novice::ScreenPrintf(12, 8, "MAP EDITOR  |  F1: EDIT  F2: PLAY");
-            Novice::ScreenPrintf(12, 28, "1: EMPTY  2: GROUND  3: WALL  4: BREAKABLE  5: ITEM");
-            Novice::ScreenPrintf(660, 8, "Selected tile: %d", editorSelectedTile);
-            Novice::ScreenPrintf(660, 28, "F5: SAVE map_data.txt   F9: LOAD");
-            Novice::ScreenPrintf(12, 680, "Move camera: WASD / Arrow keys   Left click: place   Right click: erase");
+
+
+
+
+
         }
         else if (scene == SCENE_GAME)
         {
@@ -3251,9 +3250,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 WHITE
             );
 
-            // プレイヤーのHP表示
-            Novice::ScreenPrintf(20, 45, "HP: %d / %d",
-                playerHP, kPlayerMaxHP);
+            // プレイヤーのHPを画像で表示（HP.png / bomb.png）
+            Novice::DrawSprite(40, 65, hpLabelTexture, 1.0f, 1.0f, 0.0f, WHITE);
+            for (int hpIndex = 0; hpIndex < kPlayerMaxHP; ++hpIndex) {
+                // 残りHPだけ爆弾アイコンを表示する
+                if (hpIndex < playerHP) {
+                    Novice::DrawSprite(78 + hpIndex * 30, 65, bombTexture,
+                        1.0f, 1.0f, 0.0f, WHITE);
+                }
+            }
 
             // 壊せる壁の破片を描画
             for (int i = 0; i < kMaxBreakParticles; i++)
@@ -3278,16 +3283,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 );
             }
 
-            // プレイヤー
-            Novice::DrawBox(
-                (int)(player.x - cameraX) - 20 + backGroundRandomX,
-                (int)(player.y - cameraY) - 20 + backGroundRandomY,
-                40,
-                40,
-                0.0f,
-                0x00AAFFFF,
-                kFillModeSolid
-            );
+            // プレイヤー：横3コマのスプライトシートから描画
+            Novice::DrawSpriteRect(
+                (int)(player.x - cameraX - playerWidth * 0.5f) + backGroundRandomX,
+                (int)(player.y - cameraY - playerHeight * 0.5f) + backGroundRandomY,
+                playerWalkFrame * 40, 0, 40, 40,
+                playerFacing == 1 ? playerRightTexture : playerLeftTexture,
+                1.0f / 3.0f, 1.0f, 0.0f, WHITE);
             //====================
             // 爆弾の描画
             //====================
@@ -3378,16 +3380,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     );
                 }
 
-            // プレイヤーの当たり判定の描画
-            Novice::DrawBox(
-                (int)(player.x - cameraX - playerWidth / 2.0f) + backGroundRandomX,
-                (int)(player.y - cameraY - playerHeight / 2.0f) + backGroundRandomY,
-                (int)playerWidth,
-                (int)playerHeight,
-                0.0f,
-                RED,
-                kFillModeWireFrame
-            );
+
 
         }
         else if (scene == SCENE_GAME2)
@@ -3395,9 +3388,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             Novice::DrawBox(0, 0, 1280, 720, 0.0f, 0x202030FF, kFillModeSolid);
             DrawBossMap(yukaTexture, breakableYukaTexture);
 
-            // プレイヤーのHP表示
-            Novice::ScreenPrintf(20, 20, "HP: %d / %d",
-                playerHP, kPlayerMaxHP);
+            // プレイヤーのHPを画像で表示（HP.png / bomb.png）
+            Novice::DrawSprite(40, 40, hpLabelTexture, 1.0f, 1.0f, 0.0f, WHITE);
+            for (int hpIndex = 0; hpIndex < kPlayerMaxHP; ++hpIndex) {
+                // 残りHPだけ爆弾アイコンを表示する
+                if (hpIndex < playerHP) {
+                    Novice::DrawSprite(78 + hpIndex * 30, 40, bombTexture,
+                        1.0f, 1.0f, 0.0f, WHITE);
+                }
+            }
 
             // 落石予告と落下する岩の描画
             for (int i = 0; i < kFallingRockCount; ++i) {
@@ -3465,12 +3464,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
 
 
-            // Player (world coordinates, fixed camera).
-            Novice::DrawBox(
-                (int)(player.x - playerWidth / 2.0f),
-                (int)(player.y - playerHeight / 2.0f),
-                (int)playerWidth, (int)playerHeight,
-                0.0f, 0x00AAFFFF, kFillModeSolid);
+            // ボス戦でも同じプレイヤー画像を使用
+            Novice::DrawSpriteRect(
+                (int)(player.x - playerWidth * 0.5f),
+                (int)(player.y - playerHeight * 0.5f),
+                playerWalkFrame * 40, 0, 40, 40,
+                playerFacing == 1 ? playerRightTexture : playerLeftTexture,
+                1.0f / 3.0f, 1.0f, 0.0f, WHITE);
 
             // Bombs and explosions.
             for (int i = 0; i < kBombCount; ++i) {
@@ -3609,16 +3609,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
 
             if (boss.isAlive && bossPhase == 2) {
-                Novice::ScreenPrintf(390, 86, "PHASE 2 - ROCK ARMOR");
+
                 if (armorHp > 0) {
-                    Novice::ScreenPrintf(390, 108, "ARMOR: %d / %d  - BREAK WITH BOMBS", armorHp, kArmorMaxHp);
+
                 }
                 else {
-                    Novice::ScreenPrintf(390, 108, "CORE EXPOSED! ATTACK NOW! (%d s)", (armorOpenTimer + 59) / 60);
+
                 }
                 if (transformTimer > 0) {
-                    Novice::ScreenPrintf(480, 170, "ROCK ARMOR FORMING... %d%%",
-                        (kTransformDuration - transformTimer) * 100 / kTransformDuration);
+
                 }
             }
 
@@ -3720,8 +3719,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     }
                 }
                 if (t >= 155) {
-                    Novice::ScreenPrintf(544, 235, "BOSS DEFEATED!");
-                    Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
+
+
                 }
             }
             // ボス撃破アニメーション終了後は、クリア背景を画面全体に表示する。
@@ -3730,8 +3729,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 Novice::DrawSprite(0, 0, clearBackgroundTexture, 1.0f, 1.0f, 0.0f, WHITE);
             }
             if (!boss.isAlive && bossPhase == 2 && bossDeathTimer == 0 && betrayalTimer < 0) {
-                Novice::ScreenPrintf(544, 235, "BOSS DEFEATED!");
-                Novice::ScreenPrintf(560, 265, "STAGE CLEAR!");
+
+
             }
 
             // ===== エンディングのオチ：プレイヤーの爆弾が裏切る =====
@@ -3748,13 +3747,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                     Novice::DrawEllipse(bx + 13, by - 40, spark, spark, 0.0f,
                         t > 150 ? 0xFFFFFFFF : 0xFFAA22FF, kFillModeSolid);
                     if (t < 40) {
-                        Novice::ScreenPrintf(bx - 65, by - 88, "...?");
+
                     }
                     else if (t < 150) {
-                        Novice::ScreenPrintf(bx - 100, by - 90, "WAIT FOR ME!");
+
                     }
                     else {
-                        Novice::ScreenPrintf(540, 185, "YOU'RE NEXT!");
+
                         if ((t / 4) % 2 == 0) {
                             Novice::DrawEllipse(bx, by, 32, 32, 0.0f, 0xFF3333FF, kFillModeWireFrame);
                         }
@@ -3804,11 +3803,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 kFillModeSolid
             );
 
-            Novice::ScreenPrintf(
-                390, 15,
-                "BOSS HP : %d / %d",
-                boss.hp, boss.maxHp
-            );
+
 
             // 爆発終了後、A1を背景にしてA2～A4を順番にフェードインする。
             // 各文字は60フレーム(約1秒)かけて透明度0→255になる。
@@ -3829,7 +3824,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
                 DrawEndingFade(endingA2Texture, 375); // A2: 2秒後からフェードイン
                 DrawEndingFade(endingA3Texture, 495); // A3: さらに2秒後
-                DrawEndingFade(endingA4Texture, 615); // A4: さらに2秒後
+                // A4は最初の60フレームでフェードインし、その後点滅させる。
+                // 30フレームごとに表示/非表示を切り替える（約0.5秒間隔）。
+                if (betrayalTimer >= 615) {
+                    if (betrayalTimer < 675) {
+                        DrawEndingFade(endingA4Texture, 615);
+                    }
+                    else if (((betrayalTimer - 675) / 30) % 2 == 0) {
+                        Novice::DrawSprite(0, 0, endingA4Texture,
+                            1.0f, 1.0f, 0.0f, WHITE);
+                    }
+                }
             }
 
 
@@ -3868,16 +3873,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
                 );
             }
 
-            // プレイヤーを描画
-            Novice::DrawBox(
-                (int)(player.x - playerWidth / 2.0f),
-                (int)(player.y - playerHeight / 2.0f),
-                (int)playerWidth,
-                (int)playerHeight,
-                0.0f,
-                0x00AAFFFF,
-                kFillModeSolid
-            );
+            // チュートリアルでも同じプレイヤー画像を使用
+            Novice::DrawSpriteRect(
+                (int)(player.x - playerWidth * 0.5f),
+                (int)(player.y - playerHeight * 0.5f),
+                playerWalkFrame * 40, 0, 40, 40,
+                playerFacing == 1 ? playerRightTexture : playerLeftTexture,
+                1.0f / 3.0f, 1.0f, 0.0f, WHITE);
 
             // 爆弾を描画
             for (int i = 0; i < kBombCount; i++)
@@ -3932,35 +3934,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             }
 
             // 操作説明
-            Novice::ScreenPrintf(
-                30, 20,
-                "TUTORIAL : DESTROY THE WORD SPACE!"
-            );
 
-            Novice::ScreenPrintf(
-                30, 45,
-                "A / D : MOVE"
-            );
 
-            Novice::ScreenPrintf(
-                30, 70,
-                "SPACE : PLACE BOMB"
-            );
 
-            Novice::ScreenPrintf(
-                30, 95,
-                "TAB : RETURN TO TITLE"
-            );
+
+
+
+
         }
         else if (scene == SCENE_GAMEOVER)
         {
-            Novice::DrawBox(
-                0, 0, 1280, 720,
-                0.0f, 0x000000FF, kFillModeSolid
-            );
-
-            Novice::ScreenPrintf(550, 300, "GAME OVER");
-            Novice::ScreenPrintf(500, 360, "PRESS R TO RETRY");
+            // 選択に合わせて、提供された画面画像を丸ごと切り替える
+            int screenTexture = (gameOverSelect == 0)
+                ? retryScreenTexture : titleScreenTexture;
+            Novice::DrawSprite(0, 0, screenTexture,
+                1.0f, 1.0f, 0.0f, WHITE);
+            // WS.png の操作ガイドを重ねる
+            Novice::DrawSprite(0, 0, gameOverGuideTexture,
+                1.0f, 1.0f, 0.0f, WHITE);
         }
 
         ///
