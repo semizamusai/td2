@@ -4,7 +4,7 @@
 #include <time.h>
 #include <cmath>
 #include <fstream>
-const char kWindowTitle[] = "LC1D_03_イシダ_ノリヒコ_タイトル";
+const char kWindowTitle[] = "1162_爆裂!!CHAIN POP!!";
 
 const int kTileSize = 32;
 const int kMapWidth = 200;
@@ -3110,10 +3110,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
             for (int iy = 0; iy < kMapHeight; ++iy) {
                 for (int ix = 0; ix < kMapWidth; ++ix) {
                     if (map[iy][ix] == 4) {
-                        // 1つ目のコード：アイテムの32x32当たり判定を赤枠で表示
-                        Novice::DrawBox((int)(ix * kTileSize - editorCameraX),
-                            (int)(iy * kTileSize - editorCameraY),
-                            kTileSize, kTileSize, 0.0f, RED, kFillModeWireFrame);
+                        
+                       
                         Novice::DrawSpriteRect(
                             (int)(ix * kTileSize - editorCameraX),
                             (int)(iy * kTileSize - editorCameraY),
